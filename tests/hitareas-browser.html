@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Agent Space Hit Area Assertions</title>
+    <style>
+      body {
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 24px;
+        color: #241d18;
+        background: #fffaf2;
+      }
+
+      pre {
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Agent Space Hit Area Assertions</h1>
+    <pre id="report">Running...</pre>
+    <script src="../data/game-data.js"></script>
+    <script>
+      const indoor = window.AGENT_SPACE_DATA.scenes.indoor;
+      const report = document.querySelector("#report");
+      const assertions = [];
+
+      function pointInRect(point, rect) {
+        return (
+          point.x >= rect.x &&
+          point.x <= rect.x + rect.w &&
+          point.y >= rect.y &&
+          point.y <= rect.y + rect.h
+        );
+      }
+
+      function pointInPolygon(point, polygon) {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+          const pi = polygon[i];
+          const pj = polygon[j];
+          const intersects =
+            pi.y > point.y !== pj.y > point.y &&
+            point.x < ((pj.x - pi.x) * (point.y - pi.y)) / (pj.y - pi.y) + pi.x;
+          if (intersects) inside = !inside;
+        }
+        return inside;
+      }
+
+      function pointInEllipse(point, ellipse) {
+        const rx = ellipse.rx || ellipse.w / 2;
+        const ry = ellipse.ry || ellipse.h / 2;
+        const cx = ellipse.cx ?? ellipse.x + rx;
+        const cy = ellipse.cy ?? ellipse.y + ry;
+        return ((point.x - cx) ** 2) / (rx ** 2) + ((point.y - cy) ** 2) / (ry ** 2) <= 1;
+      }
+
+      function zoneShapes(zone) {
+        if (zone.hitAreas) return zone.hitAreas;
+        if (zone.polygon) return [{ type: "polygon", points: zone.polygon }];
+        if (zone.rect) return [{ type: "rect", ...zone.rect }];
+        return [];
+      }
+
+      function pointInShape(point, shape) {
+        if (shape.type === "polygon") return pointInPolygon(point, shape.points);
+        if (shape.type === "ellipse") return pointInEllipse(point, shape);
+        return pointInRect(point, shape);
+      }
+
+      function pointInZone(point, zone) {
+        return zoneShapes(zone).some((shape) => pointInShape(point, shape));
+      }
+
+      function zoneAt(point) {
+        return (
+          Object.entries(indoor.placedObjects)
+            .map(([objectId, zone]) => ({ objectId, zone }))
+            .find(({ zone }) => pointInZone(point, zone)) || null
+        );
+      }
+
+      function assert(condition, message) {
+        assertions.push({ pass: Boolean(condition), message });
+        if (!condition) throw new Error(message);
+      }
+
+      const cases = [
+        {
+          objectId: "bedroomBed",
+          label: "bed",
+          bodyHits: [
+            { name: "pillow body", point: { x: 0.18, y: 0.27 } },
+            { name: "blanket body", point: { x: 0.27, y: 0.35 } },
+          ],
+          oldCornerMisses: [
+            { name: "old upper-left bedroom corner", point: { x: 0.04, y: 0.08 } },
+            { name: "old wardrobe-side corner", point: { x: 0.34, y: 0.12 } },
+          ],
+        },
+        {
+          objectId: "livingSofa",
+          label: "sofa",
+          bodyHits: [
+            { name: "seat cushion", point: { x: 0.34, y: 0.75 } },
+            { name: "right arm", point: { x: 0.41, y: 0.72 } },
+          ],
+          oldCornerMisses: [
+            { name: "old rug top-left corner", point: { x: 0.24, y: 0.57 } },
+            { name: "old coffee-table side corner", point: { x: 0.5, y: 0.58 } },
+          ],
+        },
+        {
+          objectId: "livingTv",
+          label: "TV",
+          bodyHits: [
+            { name: "screen body", point: { x: 0.11, y: 0.56 } },
+            { name: "cabinet body", point: { x: 0.1, y: 0.7 } },
+          ],
+          oldCornerMisses: [
+            { name: "old wall corner", point: { x: 0.02, y: 0.36 } },
+            { name: "old right-air corner", point: { x: 0.2, y: 0.5 } },
+          ],
+        },
+        {
+          objectId: "studyBookshelf",
+          label: "bookshelf",
+          bodyHits: [
+            { name: "book grid", point: { x: 0.47, y: 0.25 } },
+            { name: "lower cabinet", point: { x: 0.47, y: 0.45 } },
+          ],
+          oldCornerMisses: [
+            { name: "old plant-side corner", point: { x: 0.34, y: 0.09 } },
+            { name: "old top-right wall corner", point: { x: 0.58, y: 0.04 } },
+          ],
+        },
+        {
+          objectId: "studyDesk",
+          label: "desk",
+          bodyHits: [
+            { name: "desktop", point: { x: 0.6, y: 0.34 } },
+            { name: "chair", point: { x: 0.55, y: 0.44 } },
+          ],
+          oldCornerMisses: [
+            { name: "old window corner", point: { x: 0.78, y: 0.2 } },
+            { name: "old shelf-side corner", point: { x: 0.53, y: 0.29 } },
+          ],
+        },
+        {
+          objectId: "gardenDoor",
+          label: "door",
+          bodyHits: [
+            { name: "open door slab", point: { x: 0.86, y: 0.32 } },
+            { name: "threshold rug", point: { x: 0.8, y: 0.53 } },
+          ],
+          oldCornerMisses: [
+            { name: "old upper wall corner", point: { x: 0.82, y: 0.04 } },
+            { name: "old right-air corner", point: { x: 0.91, y: 0.34 } },
+          ],
+        },
+        {
+          objectId: "kitchenMain",
+          label: "kitchen",
+          bodyHits: [
+            { name: "counter body", point: { x: 0.75, y: 0.71 } },
+            { name: "fridge body", point: { x: 0.91, y: 0.79 } },
+          ],
+          oldCornerMisses: [
+            { name: "old shelf-wall corner", point: { x: 0.96, y: 0.54 } },
+            { name: "old room-floor corner", point: { x: 0.62, y: 0.63 } },
+          ],
+        },
+      ];
+
+      try {
+        cases.forEach((testCase) => {
+          testCase.bodyHits.forEach(({ name, point }) => {
+            const hit = zoneAt(point);
+            assert(
+              hit?.objectId === testCase.objectId,
+              `${testCase.label} body hit failed at ${name}: got ${hit?.objectId || "none"}`,
+            );
+          });
+
+          testCase.oldCornerMisses.forEach(({ name, point }) => {
+            const hit = zoneAt(point);
+            assert(
+              hit?.objectId !== testCase.objectId,
+              `${testCase.label} old-corner miss failed at ${name}: still hit ${testCase.objectId}`,
+            );
+          });
+        });
+
+        const passed = assertions.filter((item) => item.pass).length;
+        report.textContent = `HITAREA_TEST_PASS\n${passed} browser assertions passed.`;
+        document.title = "PASS Agent Space Hit Areas";
+      } catch (error) {
+        report.textContent = `HITAREA_TEST_FAIL\n${error.stack || error.message}`;
+        document.title = "FAIL Agent Space Hit Areas";
+        throw error;
+      }
+    </script>
+  </body>
+</html>
