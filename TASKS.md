@@ -2,15 +2,20 @@
 
 GitHub Issues should be the source of truth after the repository is pushed. This file is the bootstrap task board for agents and sessions.
 
+New sessions should start from `AGENTS.md`, `STATUS.md`, and `scripts/status.sh`.
+
 ## Coordination Rules
 
 - Pick one issue or task at a time.
-- Work on a dedicated branch: `codex/<area>-<short-task>`.
+- Claim the issue with `scripts/claim-issue.sh` before editing.
+- Work on a dedicated branch: `codex/issue-<number>-<short-task>`.
 - Keep changes scoped to the task's ownership area.
 - Update `CONTEXT.md` when architecture or resume context changes.
 - Open a draft PR and link the issue when the task is ready for review.
 - Codex commits must use the active session id as git user name and email prefix. See `CONTRIBUTING.md`.
 - Use `docs/issue-backlog.md` to bootstrap GitHub Issues after the first push.
+- Use `docs/collaboration.zh-CN.md` for the full multi-agent protocol.
+- Use `docs/collaboration-overview.zh-CN.md` for the short end-to-end collaboration map.
 
 ## Suggested Agent Lanes
 
