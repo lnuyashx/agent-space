@@ -32,6 +32,31 @@ Each issue should include:
 
 If an issue changes architecture or resume context, update `CONTEXT.md`.
 
+For multiple Codex sessions, use the lock protocol in `docs/collaboration.zh-CN.md`.
+An issue is claimed only after the session creates the remote lock branch:
+
+```text
+locks/issue-<number>
+```
+
+Use:
+
+```sh
+scripts/claim-issue.sh <issue-number> <session-id> <branch-slug>
+```
+
+Do not work on an issue if its lock branch already exists.
+The claim script requires a clean local worktree and a `status:ready` issue.
+
+Useful commands:
+
+```sh
+scripts/list-issue-locks.sh
+scripts/progress-issue.sh <issue-number> <session-id> progress
+scripts/progress-issue.sh <issue-number> <session-id> handoff
+scripts/release-issue-lock.sh <issue-number> <session-id> needs-review
+```
+
 Recommended labels:
 
 - `area:renderer`

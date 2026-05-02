@@ -2,6 +2,8 @@
 
 这是一个静态 MVP-alpha 体验 demo，可直接用浏览器打开 `index.html`。
 
+新 Codex session / agent 先看 `AGENTS.md` 和 `STATUS.md`。当前任务状态以 GitHub Issues 和 `scripts/status.sh` 为准。
+
 ## 当前包含
 
 - 单页大房间：室内是一个完整 agent 房间作为主舞台，不再用多个房间 tab
@@ -31,6 +33,8 @@
 - `assets/generated-room-backdrop.png` 保留为早期概念参考素材
 - `data/game-data.js` 是当前 demo 的数据模型入口，包含资产、物品目录、库存、场景、摆放对象和 agent 初始状态
 - `ARCHITECTURE.md` 记录从当前 demo 迁移到 PixiJS / 装修 / 商城 / 邻居串门的推荐路线
+- `docs/collaboration-overview.zh-CN.md` 记录 GitHub Issues / 分支 / 锁 / PR 的多 agent 协作方案
+- `AGENTS.md` 和 `STATUS.md` 是新 session 的入口文件
 
 ## 需要你确认后可替换的输入
 

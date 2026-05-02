@@ -92,9 +92,15 @@ When continuing this demo, keep the same architecture:
 
 Use GitHub as the shared coordination layer:
 
+- `AGENTS.md` and `STATUS.md` are the first files new sessions should read.
+- `scripts/status.sh` prints current repo, open issues, and active issue locks.
 - `main` should stay demo-stable.
 - Work branches should use `codex/<area>-<short-task>`.
 - GitHub Issues should track scoped agent tasks.
+- `docs/collaboration.zh-CN.md` defines the task claim/progress/handoff protocol.
+- `docs/collaboration-overview.zh-CN.md` explains the end-to-end collaboration map.
+- `docs/new-session-prompt.zh-CN.md` contains copy-paste prompts for future Codex sessions.
+- Issue claim uses remote lock branches named `locks/issue-<number>` to avoid two sessions handling the same task.
 - `ROADMAP.md` keeps the long-term direction.
 - `TASKS.md` bootstraps initial agent lanes before issues are fully populated.
 - `CONTRIBUTING.md` defines branch, issue, PR, and validation rules.
