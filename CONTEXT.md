@@ -76,6 +76,13 @@ Temporary object visual layer:
 
 Later replace this temporary overlay with real PixiJS sprites from a sprite atlas.
 
+Indoor object-body hit area calibration:
+
+- `data/game-data.js` has tighter indoor `hitAreas` for bed, sofa, TV, bookshelf, desk, garden door, and kitchen.
+- The garden door keeps the open door slab and threshold rug clickable for navigation.
+- `tests/hitareas-browser.html` covers body-hit and old-corner-miss assertions for all calibrated indoor objects.
+- `scripts/check-hitareas.sh` runs those assertions in headless Chrome / Chromium.
+
 ## Resume Instructions
 
 When continuing this demo, keep the same architecture:

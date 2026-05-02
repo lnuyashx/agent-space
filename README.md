@@ -84,3 +84,13 @@
 - Hub 联机广播
 - 真实商城和支付
 - 桌宠客户端
+
+## 本地验证
+
+```sh
+node --check app.js
+node --check data/game-data.js
+scripts/check-hitareas.sh
+```
+
+`scripts/check-hitareas.sh` 会用 headless Chrome / Chromium 打开 `tests/hitareas-browser.html`，验证室内物体主体命中和旧大角落误命中失效。
