@@ -1,4 +1,4 @@
-# Agent Space Demo Context Checkpoint
+# Agent Space Context Checkpoint
 
 This file exists so future Codex turns can resume without relying on long chat history.
 
@@ -6,14 +6,18 @@ This file exists so future Codex turns can resume without relying on long chat h
 
 The agreed long-term architecture is:
 
+- final Agent Space product, not only a web-room prototype
+- Vite + TypeScript web client
 - PixiJS 2.5D renderer
 - tile/grid walkable space
 - sprite/object layer for furniture, fixtures, crops, agents
 - item catalog + inventory + placed objects
 - slot replacement first, free placement later
 - scene snapshots for neighbor visits
+- Local Bridge / SQLite local persistence
+- ASP protocol and Cloud Hub for social mode
 
-The current static-background canvas demo is a transitional prototype only.
+The current legacy canvas renderer is the acceptance baseline while the PixiJS renderer foundation replaces it incrementally.
 
 ## Current Demo State
 
@@ -21,7 +25,9 @@ Main files:
 
 - `index.html`
 - `styles.css`
-- `app.js`
+- `src/main.ts`
+- `src/legacy/canvas-app.js`
+- `src/pixi/pixi-foundation.ts`
 - `data/assets.js`
 - `data/item-catalog.js`
 - `data/inventory.js`
@@ -32,6 +38,11 @@ Main files:
 - `data/game-data.js`
 - `ARCHITECTURE.md`
 - `README.md`
+- `README.en.md`
+- `ROADMAP.md`
+- `ROADMAP.en.md`
+- `docs/product-evolution.zh-CN.md`
+- `docs/product-evolution.en.md`
 
 Current visual assets:
 
@@ -77,6 +88,8 @@ Current data model:
 - Settings drawer save debug footer: shows save schema/status/key and can reset local save state
 - Farm plot state model: `empty -> seeded -> growing -> ready -> withered`, with owner actions and neighbor actions documented in `docs/farm-plot-state-model.zh-CN.md`
 - Room theme and bundle model: themes define style tokens and renderer requirements; bundles grant furniture and write `sceneSnapshot.themeId` plus placed object item ids
+- Vite + TypeScript project foundation
+- PixiJS renderer preview behind `?renderer=pixi`
 
 ## Current Limitation
 
@@ -97,7 +110,7 @@ Later replace this temporary overlay with real PixiJS textures resolved by `spri
 
 Indoor object-body hit area calibration:
 
-- `data/game-data.js` has tighter indoor `hitAreas` for bed, sofa, TV, bookshelf, desk, garden door, and kitchen.
+- `data/scenes.js` has tighter indoor `hitAreas` for bed, sofa, TV, bookshelf, desk, garden door, and kitchen.
 - The garden door keeps the open door slab and threshold rug clickable for navigation.
 - `tests/hitareas-browser.html` covers body-hit and old-corner-miss assertions for all calibrated indoor objects.
 - `scripts/check-hitareas.sh` runs those assertions in headless Chrome / Chromium.
@@ -109,7 +122,7 @@ Browser smoke coverage:
 
 ## Resume Instructions
 
-When continuing this demo, keep the same architecture:
+When continuing this project, keep the same architecture:
 
 - `itemCatalog` describes what can be owned or sold.
 - `inventory` describes what the user owns.
@@ -123,6 +136,8 @@ When continuing this demo, keep the same architecture:
 - New objects should use `hitAreas` polygons/rects/ellipses that trace the actual art body.
 - New interactive objects should define a walkable `interactionPoint` near the usable side of the object; movement should route through `zoneInteractionPoint()` instead of raw hit area points.
 - Decoration changes should update `placedObjects[].itemId`, then the renderer should decide how to show the new item.
+- Human-facing project introduction docs default to Chinese and provide English `.en.md` variants.
+- Use the legacy canvas renderer as behavior parity baseline while moving visuals into PixiJS.
 
 ## Collaboration
 

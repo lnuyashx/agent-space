@@ -63,12 +63,37 @@ button:hover {
   background: #1f1813;
 }
 
-#worldCanvas {
+#worldCanvas,
+.pixi-stage {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+#worldCanvas {
+  z-index: 1;
   cursor: default;
+}
+
+#worldCanvas.legacy-renderer-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pixi-stage {
+  z-index: 0;
+  background: #1f1813;
+}
+
+.pixi-stage[data-renderer="active"] {
+  z-index: 1;
+}
+
+.pixi-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .room-hud,

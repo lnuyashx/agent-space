@@ -25,7 +25,8 @@ assignees: ""
 - [ ] Code or data change is scoped to this issue
 - [ ] Issue was claimed with `scripts/claim-issue.sh`
 - [ ] Docs/context updated if behavior or architecture changed
-- [ ] `node --check app.js` passes if `app.js` changed
+- [ ] `npm run build` passes if frontend app code changed
+- [ ] `node --check src/legacy/canvas-app.js` passes if legacy canvas code changed
 - [ ] `node --check data/game-data.js` passes if data changed
 - [ ] Browser/visual check completed if UI changed
 - [ ] Lock was released with `scripts/release-issue-lock.sh` after PR handoff

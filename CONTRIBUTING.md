@@ -118,16 +118,17 @@ Every PR should include:
 - Validation performed
 - Linked issue
 
-Run these checks for JavaScript data/app changes:
+Run these checks for frontend or data changes:
 
 ```sh
-node --check app.js
+npm run build
+node --check src/legacy/canvas-app.js
 node --check data/game-data.js
 ```
 
 For visual changes, include a short note describing the browser/screenshot path used for verification.
 
-GitHub Actions runs the same syntax checks on PRs and pushes to `main`.
+GitHub Actions runs install + build checks on PRs and pushes to `main`.
 
 ## Session Handoff
 
@@ -150,7 +151,7 @@ If a session stops mid-task, leave a comment on the GitHub Issue with:
 
 Prefer these ownership boundaries:
 
-- Renderer: `app.js` drawing functions, future rendering modules, asset manifest
+- Renderer: `src/legacy/canvas-app.js`, `src/pixi/`, future rendering modules, asset manifest
 - Interaction: `hitAreas`, movement, hover/click, navigation
 - Data: `data/game-data.js`, inventory, scene snapshots, persistence
 - Docs/QA: markdown docs, issue templates, test scripts
@@ -160,7 +161,7 @@ If a change crosses lanes, mention that in the issue or PR.
 ## Conflict Avoidance
 
 - Avoid two active issues editing the same function or data object.
-- When a task needs broad edits to `app.js` or `data/game-data.js`, state the intended sections in the issue before starting.
+- When a task needs broad edits to `src/legacy/canvas-app.js`, `src/pixi/`, or `data/game-data.js`, state the intended sections in the issue before starting.
 - Do not reformat entire files unless the issue is explicitly about formatting.
 - Do not revert another agent's changes without an issue comment explaining why.
 
