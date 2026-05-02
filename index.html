@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent Space Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="room-stage" aria-label="Agent room">
+        <canvas id="worldCanvas" width="1280" height="720" aria-label="Agent Space full room"></canvas>
+
+        <section class="room-hud hud-left">
+          <div class="agent-chip">
+            <canvas id="avatarCanvas" width="72" height="72" aria-label="Aria avatar"></canvas>
+            <div>
+              <strong id="activeAgentName">Aria</strong>
+              <span id="moodCopy">心情愉悦</span>
+            </div>
+          </div>
+          <div class="hud-meters">
+            <label><span>能量</span><b id="energyText">86</b><i><em id="energyBar"></em></i></label>
+            <label><span>心情</span><b id="moodText">78</b><i><em id="moodBar"></em></i></label>
+            <label><span>经验</span><b id="expText">120</b><i><em id="expBar"></em></i></label>
+          </div>
+        </section>
+
+        <section class="room-hud hud-center">
+          <span class="pulse"></span>
+          <span id="currentTask">在客厅休息</span>
+          <small id="previewHint">真实状态</small>
+        </section>
+
+        <section class="room-hud hud-right">
+          <span>金币</span>
+          <strong id="coinValue">50</strong>
+          <button class="ghost-button" id="modeBtn" type="button">
+            <span class="status-dot"></span>
+            <span id="modeLabel">单机</span>
+          </button>
+        </section>
+
+        <div class="toast-stack" id="toastStack"></div>
+      </main>
+
+      <footer class="conversation-dock">
+        <div class="agent-tabs" id="agentTabs">
+          <button class="active" type="button" data-agent="Aria">Aria</button>
+          <button type="button" data-agent="Luna">Luna</button>
+          <button type="button" data-agent="Mika">Mika</button>
+        </div>
+        <button class="settings-button" id="settingsBtn" type="button" title="设置">⚙ 设置</button>
+        <div class="composer">
+          <select id="intentSelect" aria-label="指令类型">
+            <option value="auto">自动</option>
+            <option value="speak">聊天</option>
+            <option value="task">任务</option>
+            <option value="goto">移动</option>
+          </select>
+          <textarea id="promptInput" rows="1" placeholder="对 Aria 说句话，或让 TA 做点事..."></textarea>
+          <button id="sendBtn" type="button">发送</button>
+        </div>
+      </footer>
+    </div>
+
+    <aside class="artifact-drawer" id="artifactDrawer" aria-hidden="true">
+      <div class="drawer-head">
+        <div>
+          <span>本地 Artifact</span>
+          <h2 id="artifactTitle">任务结果</h2>
+        </div>
+        <button class="icon-button" id="closeArtifactBtn" type="button" title="关闭">×</button>
+      </div>
+      <pre id="artifactContent"></pre>
+      <button id="copyArtifactBtn" type="button">复制内容</button>
+    </aside>
+
+    <aside class="decorate-drawer" id="decorateDrawer" aria-hidden="true">
+      <div class="drawer-head">
+        <div>
+          <span>装修模式</span>
+          <h2>槽位替换 / 商城</h2>
+        </div>
+        <button class="icon-button" id="closeDecorateBtn" type="button" title="关闭">×</button>
+      </div>
+      <div class="decorate-body">
+        <section>
+          <h3>房间槽位</h3>
+          <div class="slot-list" id="decorateSlotList"></div>
+        </section>
+        <section>
+          <h3 id="decorateCurrentSlot">选择槽位</h3>
+          <div class="item-list" id="decorateItemList"></div>
+        </section>
+      </div>
+    </aside>
+
+    <script src="./data/game-data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

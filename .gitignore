@@ -1,0 +1,24 @@
+.DS_Store
+Thumbs.db
+
+# Local dependency and build output
+node_modules/
+dist/
+build/
+.parcel-cache/
+.vite/
+
+# Local test and browser artifacts
+demo-*.png
+*.log
+.tmp/
+tmp/
+
+# Local editor files
+.idea/
+.vscode/
+*.swp
+
+# Local secrets
+.env
+.env.*
