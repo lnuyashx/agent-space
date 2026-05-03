@@ -30,9 +30,9 @@ if [[ "$CHROME_STATUS" -ne 0 ]]; then
   exit "$CHROME_STATUS"
 fi
 
-if ! grep -q "<title>PASS Agent Space Hit Areas</title>" <<<"$OUTPUT"; then
-  echo "Hit area browser assertions failed." >&2
+if ! grep -q "HITAREA_TEST_PASS" <<<"$OUTPUT"; then
   printf '%s\n' "$OUTPUT"
+  echo "Hit area browser assertions failed." >&2
   exit 1
 fi
 

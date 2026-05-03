@@ -57,3 +57,11 @@ The current phase upgrades the Web client from static canvas prototype to Vite +
 
 See [ROADMAP.en.md](ROADMAP.en.md) and [docs/product-evolution.en.md](docs/product-evolution.en.md).
 
+## Local Validation
+
+```sh
+npm run check
+npm run build
+```
+
+`npm run check` validates TypeScript, the legacy renderer, data syntax, and the browser hit-area assertions in `tests/hitareas-browser.html`.
