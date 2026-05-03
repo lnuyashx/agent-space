@@ -3,7 +3,16 @@ const ctx = canvas.getContext("2d");
 const avatarCanvas = document.querySelector("#avatarCanvas");
 const avatarCtx = avatarCanvas.getContext("2d");
 const gameData = window.AGENT_SPACE_DATA;
-const SAVE_KEY = "agent-space-demo-save-v1";
+const SAVE_SCHEMA_VERSION = 2;
+const SAVE_KEY = "agent-space-demo-save";
+const LEGACY_SAVE_KEYS = ["agent-space-demo-save-v1"];
+const saveDebugState = {
+  key: SAVE_KEY,
+  schemaVersion: SAVE_SCHEMA_VERSION,
+  status: "fresh",
+  savedAt: null,
+  error: null,
+};
 const savedState = readSavedState();
 
 const sceneImages = Object.fromEntries(
@@ -121,15 +130,43 @@ const el = {
   decorateSlotList: document.querySelector("#decorateSlotList"),
   decorateItemList: document.querySelector("#decorateItemList"),
   decorateCurrentSlot: document.querySelector("#decorateCurrentSlot"),
+  saveSchemaLabel: document.querySelector("#saveSchemaLabel"),
+  saveDebugMeta: document.querySelector("#saveDebugMeta"),
+  resetSaveBtn: document.querySelector("#resetSaveBtn"),
 };
 
 function readSavedState() {
-  try {
-    return JSON.parse(window.localStorage.getItem(SAVE_KEY) || "{}");
-  } catch (error) {
-    console.warn("Failed to read saved Agent Space state", error);
-    return {};
+  const saveKeys = [SAVE_KEY, ...LEGACY_SAVE_KEYS];
+  for (const key of saveKeys) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") throw new Error("Save payload must be an object");
+      const schemaVersion = Number(parsed.schemaVersion || 1);
+      if (!Number.isInteger(schemaVersion) || schemaVersion < 1) {
+        throw new Error(`Unsupported save schema value: ${parsed.schemaVersion}`);
+      }
+      saveDebugState.key = key;
+      saveDebugState.schemaVersion = schemaVersion;
+      saveDebugState.savedAt = parsed.savedAt || null;
+      saveDebugState.error = null;
+      if (schemaVersion > SAVE_SCHEMA_VERSION) {
+        saveDebugState.status = "incompatible";
+        saveDebugState.error = `schema v${schemaVersion}`;
+        return {};
+      }
+      saveDebugState.status = key === SAVE_KEY && schemaVersion === SAVE_SCHEMA_VERSION ? "loaded" : "migrated";
+      return parsed;
+    } catch (error) {
+      saveDebugState.key = key;
+      saveDebugState.status = "invalid";
+      saveDebugState.error = error.message;
+      console.warn("Failed to read saved Agent Space state", error);
+      return {};
+    }
   }
+  return {};
 }
 
 function applySavedInventory(inventory) {
@@ -161,8 +198,8 @@ function applySavedSceneSnapshot(sceneSnapshot) {
   });
 }
 
-function saveGameState() {
-  const sceneSnapshot = Object.fromEntries(
+function buildSceneSnapshot() {
+  return Object.fromEntries(
     Object.entries(scenes).map(([sceneId, scene]) => [
       sceneId,
       {
@@ -172,19 +209,47 @@ function saveGameState() {
       },
     ]),
   );
+}
+
+function saveGameState() {
+  const savedAt = new Date().toISOString();
+  const sceneSnapshot = buildSceneSnapshot();
+  const payload = {
+    schemaVersion: SAVE_SCHEMA_VERSION,
+    savedAt,
+    inventory: {
+      owned: gameData.inventory.owned,
+      coins: gameData.inventory.coins,
+    },
+    sceneSnapshot,
+  };
   try {
-    window.localStorage.setItem(
-      SAVE_KEY,
-      JSON.stringify({
-        inventory: {
-          owned: gameData.inventory.owned,
-          coins: gameData.inventory.coins,
-        },
-        sceneSnapshot,
-      }),
-    );
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    LEGACY_SAVE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+    saveDebugState.key = SAVE_KEY;
+    saveDebugState.schemaVersion = SAVE_SCHEMA_VERSION;
+    saveDebugState.status = "saved";
+    saveDebugState.savedAt = savedAt;
+    saveDebugState.error = null;
+    renderSaveDebug();
   } catch (error) {
+    saveDebugState.status = "invalid";
+    saveDebugState.error = error.message;
+    renderSaveDebug();
     console.warn("Failed to save Agent Space state", error);
+  }
+}
+
+function resetLocalSave() {
+  const confirmed = window.confirm("重置本地存档？购买记录、金币和家具摆放会恢复默认。");
+  if (!confirmed) return;
+  try {
+    [SAVE_KEY, ...LEGACY_SAVE_KEYS].forEach((key) => window.localStorage.removeItem(key));
+    toast("本地存档已重置");
+    window.setTimeout(() => window.location.reload(), 420);
+  } catch (error) {
+    console.warn("Failed to reset Agent Space save state", error);
+    toast("重置失败，请查看控制台");
   }
 }
 
@@ -1128,6 +1193,28 @@ function renderStatus() {
     el.previewHint.textContent = state.currentScene === "yard" ? "院子页面" : "真实状态";
   }
   drawAvatar();
+  renderSaveDebug();
+}
+
+function saveStatusText() {
+  if (saveDebugState.status === "loaded") return "已加载";
+  if (saveDebugState.status === "migrated") return "已迁移旧存档";
+  if (saveDebugState.status === "saved") return "已保存";
+  if (saveDebugState.status === "invalid") return "存档异常";
+  if (saveDebugState.status === "incompatible") return "版本不兼容";
+  return "默认初始数据";
+}
+
+function renderSaveDebug() {
+  if (!el.saveSchemaLabel || !el.saveDebugMeta) return;
+  const ownedTotal = Object.values(gameData.inventory.owned).reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0);
+  const placedTotal = Object.values(scenes).reduce((sum, scene) => sum + Object.keys(scene.zones).length, 0);
+  const savedAt = saveDebugState.savedAt
+    ? new Date(saveDebugState.savedAt).toLocaleString("zh-CN", { hour12: false })
+    : "未写入";
+  const errorText = saveDebugState.error ? ` · ${saveDebugState.error}` : "";
+  el.saveSchemaLabel.textContent = `Schema v${SAVE_SCHEMA_VERSION}`;
+  el.saveDebugMeta.textContent = `${saveStatusText()} · ${saveDebugState.key} · 物品 ${ownedTotal} · 摆放 ${placedTotal} · ${savedAt}${errorText}`;
 }
 
 function switchAgent(name) {
@@ -1227,6 +1314,7 @@ document.querySelector("#closeArtifactBtn").addEventListener("click", () => {
 });
 
 document.querySelector("#closeDecorateBtn").addEventListener("click", closeDecoratePanel);
+el.resetSaveBtn.addEventListener("click", resetLocalSave);
 
 document.querySelector("#copyArtifactBtn").addEventListener("click", async () => {
   if (!state.artifact) return;
