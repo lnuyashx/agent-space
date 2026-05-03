@@ -28,6 +28,7 @@
 - `assets/scene-indoor-v2.png` 是当前室内整屋背景
 - `assets/scene-yard.png` 是当前院子背景
 - `assets/aria-agent-v2.png` 是当前原创 anime agent 角色素材
+- `assets/furniture-prototype-atlas.svg` 是第一版独立物件 prototype atlas，用来验证 sprite 管线，不代表最终美术品质
 - `assets/scene-full-room.png` 是上一版完整大房间背景，保留参考
 - `assets/scene-main-room.png` 是上一版主房间场景素材，保留参考
 - `assets/scene-study.png`、`assets/scene-kitchen.png`、`assets/scene-bedroom.png`、`assets/scene-studio.png` 是新增独立房间底图
@@ -51,7 +52,7 @@
 当前 demo 把一张背景图拆成五层处理，但交互数据已经从 `app.js` 抽到 `data/` 下的分层数据文件：
 
 1. 背景层：`scene-indoor-v2.png` / `scene-yard.png`
-2. 物品层：`itemCatalog` 定义可售卖/可替换物品，比如床、沙发、电脑桌、农田；当前带 `price` 和 `sprite` 字段
+2. 物品层：`itemCatalog` 定义可售卖/可替换物品，比如床、沙发、电脑桌、农田；当前带 `price` 和 `sprite` 字段，`assets.atlases` 提供 prototype atlas 帧表
 3. 摆放层：`placedObjects` 标注用户房间里实际摆了什么，以及对应的热区和站位
 4. 行走层：`walkableRects` 标注可走地面，点击空地会移动到可走点
 5. 角色层：agent 根据 `point`、`facing`、`status` 绘制和移动
@@ -60,7 +61,7 @@
 
 - `itemId`：指向商城/库存里的物品，比如 `computer_desk_basic`
 - `itemCatalog[itemId].price`：本地金币价格，当前只做 demo 购买，不涉及真实支付
-- `itemCatalog[itemId].sprite`：包含 `atlasKey`、`spriteId`、`anchor` 和当前 demo 用的 `fallback`，正式版会接真实 sprite atlas
+- `itemCatalog[itemId].sprite`：包含 `atlasKey`、`spriteId`、`anchor` 和当前 demo 用的 `fallback`；当前会优先从 `assets/furniture-prototype-atlas.svg` 取帧，缺图时回退到 canvas fallback
 - `slot`：槽位，比如 `study.desk`，V1 装修先从槽位替换开始
 - `label`：显示名，比如“大门”
 - `type`：`preview` / `navigate` / `yard`

@@ -19,7 +19,7 @@ The current canvas demo keeps the static background for visual speed, but the in
 
 The current browser data entrypoint is still `window.AGENT_SPACE_DATA`, but it is composed from smaller classic-script modules:
 
-- `data/assets.js`: scene backgrounds and character sprite paths
+- `data/assets.js`: scene backgrounds, character sprite paths, and sprite atlas manifests starting with `prototype-furniture`
 - `data/item-catalog.js`: sellable or system items, such as beds, desks, doors, farm plots, mailbox
 - `itemCatalog[].price`: local-demo coin price for shop validation
 - `itemCatalog[].sprite`: sprite atlas identity plus fallback drawing metadata for the static-background prototype
@@ -101,6 +101,8 @@ This is intentionally not the final art path. It proves the correct data flow be
 - `spriteId`: stable item-frame identity, for example `desk.dual_monitor`
 - `anchor`: normalized sprite anchor, ready for PixiJS placement
 - `fallback`: color/kind metadata for the canvas placeholder while real art is missing
+
+The first prototype atlas lives at `assets/furniture-prototype-atlas.svg`. It is intentionally simple independent object art so the renderer can prove atlas-frame resolution before production sprites exist.
 
 The production equivalent should use:
 
