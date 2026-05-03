@@ -20,7 +20,7 @@
 - 点击空地角色会移动。
 - 物件交互已从大矩形热区改为 `hitAreas` 本体轮廓。
 - 装修抽屉支持槽位替换。
-- 本地商城 demo 支持金币购买未拥有家具。
+- 本地商城原型支持金币购买未拥有家具。
 - `localStorage` 保存金币、库存和摆放快照。
 - Vite + TypeScript + PixiJS 项目基座已开始接入。
 - 默认 renderer 仍保留完整 legacy canvas 行为。

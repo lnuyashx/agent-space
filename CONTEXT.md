@@ -19,7 +19,7 @@ The agreed long-term architecture is:
 
 The current legacy canvas renderer is the acceptance baseline while the PixiJS renderer foundation replaces it incrementally.
 
-## Current Demo State
+## Current Project State
 
 Main files:
 
@@ -80,7 +80,7 @@ Current data model:
   - `preview_research`
   - `preview_cook`
   - `preview_rest`
-  - `preview_idle`
+- `preview_idle`
 - Decoration drawer launched via Settings button
 - Slot replacement updates `placedObjects[].itemId`
 - Local shop loop: unowned compatible furniture appears in the same drawer, can be bought with demo coins, then equipped
@@ -145,7 +145,7 @@ Use GitHub as the shared coordination layer:
 
 - `AGENTS.md` and `STATUS.md` are the first files new sessions should read.
 - `scripts/status.sh` prints current repo, open issues, and active issue locks.
-- `main` should stay demo-stable.
+- `main` should stay stable and shippable.
 - Work branches should use `codex/<area>-<short-task>`.
 - GitHub Issues should track scoped agent tasks.
 - `docs/collaboration.zh-CN.md` defines the task claim/progress/handoff protocol.

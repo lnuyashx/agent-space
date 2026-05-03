@@ -4,7 +4,7 @@ This repository is expected to be worked on by multiple Codex sessions and agent
 
 ## Branches
 
-- `main` is the stable demo branch.
+- `main` is the stable project branch.
 - Use `codex/<area>-<short-task>` for agent work.
 - Do not push unrelated changes into another agent's branch.
 - Before starting work, pull/rebase from `main` and read `CONTEXT.md`, `ROADMAP.md`, and the issue you are claiming.
