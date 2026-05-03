@@ -26,3 +26,6 @@ jobs:
           for file in data/*.js; do
             node --check "$file"
           done
+
+      - name: Run browser smoke checks
+        run: scripts/check-smoke.sh

@@ -95,6 +95,11 @@ Indoor object-body hit area calibration:
 - `tests/hitareas-browser.html` covers body-hit and old-corner-miss assertions for all calibrated indoor objects.
 - `scripts/check-hitareas.sh` runs those assertions in headless Chrome / Chromium.
 
+Browser smoke coverage:
+
+- `tests/smoke-browser.html` loads the real `index.html` in a browser frame and simulates the core user path.
+- `scripts/check-smoke.sh` verifies app boot, object hit testing, door navigation, decoration drawer, shop purchase, and `localStorage` reload persistence without storing screenshots by default.
+
 ## Resume Instructions
 
 When continuing this demo, keep the same architecture:
