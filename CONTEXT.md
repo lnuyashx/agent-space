@@ -27,6 +27,7 @@ Main files:
 - `data/inventory.js`
 - `data/scenes.js`
 - `data/agents.js`
+- `data/farm-model.js`
 - `data/game-data.js`
 - `ARCHITECTURE.md`
 - `README.md`
@@ -45,6 +46,7 @@ Current data model:
 - `placedObjects`: bed, sofa, TV, bookshelf, desk, door, kitchen, farm plots, mailbox
 - `walkableRects`: temporary walkable areas for static backgrounds
 - `agents`: Aria/Luna/Mika initial states
+- `farm`: crop lifecycle, plot snapshot shape, owner actions, neighbor actions, social sync rules
 - `data/game-data.js`: compatibility composer that exposes `window.AGENT_SPACE_DATA` from `window.AGENT_SPACE_DATA_MODULES`
 
 ## Implemented Features
@@ -66,6 +68,7 @@ Current data model:
 - Slot replacement updates `placedObjects[].itemId`
 - Local shop loop: unowned compatible furniture appears in the same drawer, can be bought with demo coins, then equipped
 - Browser `localStorage` save: owned items, coins, and scene placed-object item ids persist across refresh
+- Farm plot state model: `empty -> seeded -> growing -> ready -> withered`, with owner actions and neighbor actions documented in `docs/farm-plot-state-model.zh-CN.md`
 
 ## Current Limitation
 
@@ -97,6 +100,7 @@ When continuing this demo, keep the same architecture:
 - `inventory` describes what the user owns.
 - `scenes[].placedObjects` describes what is actually placed in a room.
 - Data files are loaded as classic browser scripts: module slices populate `window.AGENT_SPACE_DATA_MODULES`, and `data/game-data.js` composes the legacy app entrypoint.
+- Farm plot objects should use stable `farmPlotId` values; future saves should store farm snapshots by that id rather than by canvas position.
 - Local demo persistence uses `localStorage`; production should replace it with Local Bridge / SQLite / Hub sync.
 - Hotspots must stay aligned with the visible art object they represent.
 - New objects should use `hitAreas` polygons/rects/ellipses that trace the actual art body.

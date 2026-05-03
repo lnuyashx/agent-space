@@ -28,6 +28,7 @@ The current browser data entrypoint is still `window.AGENT_SPACE_DATA`, but it i
 - `placedObjects`: furniture / fixtures / farm objects placed in each scene
 - `walkableRects`: temporary walkable areas for this static-background prototype
 - `data/agents.js`: initial agent states
+- `data/farm-model.js`: crop lifecycle, plot snapshot shape, owner actions, neighbor actions, and social sync rules
 - `data/game-data.js`: compatibility composer that validates required modules and exposes `window.AGENT_SPACE_DATA`
 - `localStorage`: current demo persistence for inventory coins, owned items, and placed object item ids
 
@@ -37,6 +38,7 @@ In production these browser script modules should become:
 - `inventory`: user-owned items from Local Bridge / Hub
 - `sceneSnapshot`: user's placed room objects
 - `sceneTemplate`: default room slots and allowed placement rules
+- `farmSnapshot`: plot state keyed by stable `farmPlotId`
 
 ## Placed Object Shape
 
@@ -149,3 +151,15 @@ Static backgrounds are good for proving mood and layout, but weak for:
 - furniture drag/drop
 
 The current demo should therefore be treated as a visual prototype plus data-model bridge, not as the final rendering architecture.
+
+## Farm Plot Model
+
+The yard farm model is intentionally data-first. `data/farm-model.js` defines:
+
+- lifecycle states: `empty`, `seeded`, `growing`, `ready`, `withered`
+- owner actions: `plant`, `water`, `fertilize`, `harvest`, `clear`
+- neighbor actions: `help_water`, `steal`
+- crop metadata for starter crops
+- a default plot snapshot shape for later persistence
+
+Current yard fields in `data/scenes.js` only map visual objects to stable `farmPlotId` values. Future gameplay should save farm progress by `farmPlotId`, not by canvas coordinates or temporary hit-area geometry.
