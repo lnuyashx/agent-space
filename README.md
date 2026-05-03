@@ -17,7 +17,7 @@
 - 走路表现：移动时有朝向翻转、上下步幅、落点光标和缓动动画
 - 会话驱动状态：真实工作/休息由底部会话框触发，agent 自动移动到对应区域
 - 装修 / 商城雏形：点击「设置」打开槽位式装修抽屉；已拥有物品可直接装备，未拥有物品可用本地金币购买后装备
-- 临时对象层：替换家具后，画面会按 `itemCatalog[itemId].sprite` 在对应槽位绘制一个 fallback 家具占位物，证明 `placedObjects[].itemId` 已经驱动画面变化；正式版会换成真实 sprite atlas
+- 临时对象层：装修模式会切到空房间 prototype 背景，再按 `itemCatalog[itemId].sprite` 在对应槽位绘制独立家具；正式版会换成真实 sprite atlas 和生产级空房间底图
 - 本地快照：购买记录、金币和已摆放家具会按 `schemaVersion` 写入浏览器 `localStorage`，刷新后保留；设置抽屉里可查看存档状态并重置本地存档
 - Agent 状态面板、能量、心情、经验
 - 输入聊天、移动、派任务
@@ -26,6 +26,7 @@
 - 农田状态模型：`data/farm-model.js` 定义空地、播种、生长、可收获、枯萎生命周期，以及主人/邻居动作边界
 - 房间主题 / 家具包模型：`data/theme-bundles.js` 定义主题字段、bundle 授权、装备写入和渲染依赖
 - `assets/scene-indoor-v2.png` 是当前室内整屋背景
+- `assets/scene-indoor-empty-prototype.svg` 是装修模式专用的空房间 prototype 背景，用来避免旧家具烘焙在底图里继续露出
 - `assets/scene-yard.png` 是当前院子背景
 - `assets/aria-agent-v2.png` 是当前原创 anime agent 角色素材
 - `assets/furniture-prototype-atlas.svg` 是第一版独立物件 prototype atlas，用来验证 sprite 管线，不代表最终美术品质
@@ -51,7 +52,7 @@
 
 当前 demo 把一张背景图拆成五层处理，但交互数据已经从 `app.js` 抽到 `data/` 下的分层数据文件：
 
-1. 背景层：`scene-indoor-v2.png` / `scene-yard.png`
+1. 背景层：常规室内使用 `scene-indoor-v2.png`，装修模式使用 `scene-indoor-empty-prototype.svg`，院子使用 `scene-yard.png`
 2. 物品层：`itemCatalog` 定义可售卖/可替换物品，比如床、沙发、电脑桌、农田；当前带 `price` 和 `sprite` 字段，`assets.atlases` 提供 prototype atlas 帧表
 3. 摆放层：`placedObjects` 标注用户房间里实际摆了什么，以及对应的热区和站位
 4. 行走层：`walkableRects` 标注可走地面，点击空地会移动到可走点
@@ -62,6 +63,7 @@
 - `itemId`：指向商城/库存里的物品，比如 `computer_desk_basic`
 - `itemCatalog[itemId].price`：本地金币价格，当前只做 demo 购买，不涉及真实支付
 - `itemCatalog[itemId].sprite`：包含 `atlasKey`、`spriteId`、`anchor` 和当前 demo 用的 `fallback`；当前会优先从 `assets/furniture-prototype-atlas.svg` 取帧，缺图时回退到 canvas fallback
+- `decoratingAssetId`：场景在装修模式下使用的替代背景；当前室内指向空房间 prototype，方便独立家具层可视化
 - `slot`：槽位，比如 `study.desk`，V1 装修先从槽位替换开始
 - `label`：显示名，比如“大门”
 - `type`：`preview` / `navigate` / `yard`

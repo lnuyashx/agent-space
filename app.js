@@ -55,6 +55,7 @@ const scenes = Object.fromEntries(
     {
       ...scene,
       image: sceneImages[scene.assetId],
+      decoratingImage: scene.decoratingAssetId ? sceneImages[scene.decoratingAssetId] : null,
       zones: scene.placedObjects,
     },
   ]),
@@ -274,11 +275,18 @@ function activeScene() {
   return scenes[state.currentScene];
 }
 
+function activeSceneImage() {
+  const scene = activeScene();
+  const decoratingImage = state.decorating ? scene.decoratingImage : null;
+  if (decoratingImage?.complete && decoratingImage.naturalWidth) return decoratingImage;
+  return scene.image;
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function rectForCover(image = activeScene().image) {
+function rectForCover(image = activeSceneImage()) {
   const imageRatio = image.width / image.height || 16 / 9;
   const canvasRatio = canvas.width / canvas.height;
   let width = canvas.width;
@@ -584,7 +592,7 @@ function updateAgentPosition() {
 }
 
 function drawRoom() {
-  const image = activeScene().image;
+  const image = activeSceneImage();
   if (!image.complete || !image.naturalWidth) {
     ctx.fillStyle = state.currentScene === "yard" ? "#9ec877" : "#ead2b6";
     ctx.fillRect(0, 0, canvas.width, canvas.height);

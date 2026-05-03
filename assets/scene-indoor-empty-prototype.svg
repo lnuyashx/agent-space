@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1672" height="941" viewBox="0 0 1672 941">
+  <defs>
+    <linearGradient id="floor" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#d5a978"/>
+      <stop offset=".55" stop-color="#c98e58"/>
+      <stop offset="1" stop-color="#9e6b43"/>
+    </linearGradient>
+    <linearGradient id="wall" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f3e2c8"/>
+      <stop offset="1" stop-color="#d6b38c"/>
+    </linearGradient>
+    <style>
+      .wall { fill: url(#wall); stroke: #8e6749; stroke-width: 8; stroke-linejoin: round; }
+      .floor { fill: url(#floor); stroke: #735039; stroke-width: 8; stroke-linejoin: round; }
+      .trim { stroke: #8b613f; stroke-width: 10; stroke-linecap: round; }
+      .thin { stroke: rgba(94, 63, 42, .34); stroke-width: 3; }
+      .window { fill: #cce7ef; stroke: #805739; stroke-width: 8; }
+      .rug { fill: rgba(236, 191, 170, .48); stroke: rgba(148, 85, 70, .45); stroke-width: 5; }
+      .label { font: 600 30px ui-sans-serif, system-ui; fill: rgba(82, 58, 40, .45); }
+    </style>
+  </defs>
+
+  <rect width="1672" height="941" fill="#201812"/>
+  <path class="wall" d="M65 177 834 28l773 150v412L834 763 65 590z"/>
+  <path class="floor" d="M65 590 834 395l773 195-773 299z"/>
+  <path fill="rgba(255,255,255,.16)" d="M91 191 834 53l746 138-746 166z"/>
+  <path class="trim" fill="none" d="M65 177 834 28l773 150M65 590 834 763l773-173M834 28v367"/>
+
+  <g opacity=".62">
+    <path class="thin" d="M179 624 842 461 1481 622"/>
+    <path class="thin" d="M274 660 843 512 1386 662"/>
+    <path class="thin" d="M372 696 844 563 1289 700"/>
+    <path class="thin" d="M472 735 844 617 1188 740"/>
+    <path class="thin" d="M573 774 844 675 1085 780"/>
+    <path class="thin" d="M684 817 844 739 976 823"/>
+    <path class="thin" d="M183 560 183 663"/>
+    <path class="thin" d="M314 527 314 713"/>
+    <path class="thin" d="M447 495 447 766"/>
+    <path class="thin" d="M582 462 582 824"/>
+    <path class="thin" d="M721 430 721 874"/>
+    <path class="thin" d="M955 430 955 874"/>
+    <path class="thin" d="M1095 462 1095 824"/>
+    <path class="thin" d="M1231 495 1231 766"/>
+    <path class="thin" d="M1364 527 1364 713"/>
+    <path class="thin" d="M1493 560 1493 663"/>
+  </g>
+
+  <g>
+    <rect class="window" x="950" y="126" width="215" height="155" rx="8"/>
+    <path stroke="#805739" stroke-width="7" d="M1058 126v155M950 204h215"/>
+    <path fill="#9fd0b4" d="M962 262c39-54 77-71 119-23 35-44 61-52 78 23z"/>
+    <rect class="window" x="1223" y="202" width="170" height="250" rx="8"/>
+    <path stroke="#805739" stroke-width="7" d="M1308 202v250M1223 328h170"/>
+    <path fill="#efb2b8" opacity=".72" d="M1241 396c30-74 64-74 91 0 20-44 40-43 51 0z"/>
+  </g>
+
+  <g>
+    <path class="rug" d="M183 675 447 611l216 63-276 83z"/>
+    <path class="rug" d="M1066 662 1285 610l183 58-229 70z"/>
+    <path class="rug" d="M330 318 526 275l145 46-204 57z"/>
+  </g>
+
+  <g opacity=".5">
+    <text class="label" x="300" y="268">bedroom slot</text>
+    <text class="label" x="672" y="256">study slot</text>
+    <text class="label" x="227" y="582">living slot</text>
+    <text class="label" x="1068" y="557">kitchen slot</text>
+    <text class="label" x="1233" y="492">door slot</text>
+  </g>
+</svg>

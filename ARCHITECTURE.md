@@ -93,6 +93,7 @@ The current demo now draws a temporary object layer between the room background 
 - Decoration changes update `placedObjects[].itemId`.
 - The renderer reads `itemCatalog[itemId].sprite`.
 - Default furniture stays mostly represented by the static background.
+- Decoration mode can swap the scene background through `scenes[].decoratingAssetId`, so the indoor scene uses an empty-room prototype background while independent furniture sprites are drawn on top.
 - Replaced furniture remains visible as a small pixel-style object marker after leaving decoration mode.
 
 This is intentionally not the final art path. It proves the correct data flow before the project has a furniture sprite atlas. The current sprite metadata shape is:
@@ -102,7 +103,7 @@ This is intentionally not the final art path. It proves the correct data flow be
 - `anchor`: normalized sprite anchor, ready for PixiJS placement
 - `fallback`: color/kind metadata for the canvas placeholder while real art is missing
 
-The first prototype atlas lives at `assets/furniture-prototype-atlas.svg`. It is intentionally simple independent object art so the renderer can prove atlas-frame resolution before production sprites exist.
+The first prototype atlas lives at `assets/furniture-prototype-atlas.svg`. It is intentionally simple independent object art so the renderer can prove atlas-frame resolution before production sprites exist. The matching empty-room prototype background lives at `assets/scene-indoor-empty-prototype.svg`; it only removes baked-in furniture during decoration mode and is not production room art.
 
 The production equivalent should use:
 
