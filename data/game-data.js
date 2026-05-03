@@ -1,7 +1,7 @@
 // Composes browser-loaded data modules into the legacy app data entrypoint.
 (function () {
   const modules = window.AGENT_SPACE_DATA_MODULES || {};
-  const requiredModules = ["assets", "itemCatalog", "inventory", "scenes", "agents"];
+  const requiredModules = ["assets", "itemCatalog", "inventory", "scenes", "agents", "farm"];
   const missingModules = requiredModules.filter((key) => !modules[key]);
 
   if (missingModules.length) {
@@ -14,5 +14,6 @@
     inventory: modules.inventory,
     scenes: modules.scenes,
     agents: modules.agents,
+    farm: modules.farm,
   };
 })();
