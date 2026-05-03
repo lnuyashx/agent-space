@@ -6,7 +6,7 @@
 
 ## 项目状态
 
-- GitHub 仓库：`https://github.com/lnuyashx/agent-space-demo`
+- GitHub 仓库：`https://github.com/lnuyashx/agent-space`
 - 主分支：`main`
 - 协作方式：GitHub Issues + labels + milestones + remote lock branches
 - 锁分支格式：`locks/issue-<编号>`
