@@ -64,7 +64,8 @@ const agents = Object.fromEntries(
   Object.entries(gameData.agents).map(([name, agent]) => {
     const initialObject = agent.initialObject;
     const sceneId = initialObject?.scene || initialScene;
-    const objectPoint = initialObject ? scenes[sceneId].zones[initialObject.objectId]?.point : null;
+    const objectZone = initialObject ? scenes[sceneId].zones[initialObject.objectId] : null;
+    const objectPoint = objectZone ? zoneInteractionPoint(objectZone, scenes[sceneId]) : null;
     return [
       name,
       {
@@ -426,8 +427,8 @@ function itemCommerceText(itemId, item) {
   return `${item.category} · ${itemPrice(item)} 金币`;
 }
 
-function pointInWalkable(point) {
-  return activeScene().walkableRects.some((rect) => pointInRect(point, rect));
+function pointInWalkable(point, scene = activeScene()) {
+  return scene.walkableRects.some((rect) => pointInRect(point, rect));
 }
 
 function clampPointToRect(point, rect) {
@@ -437,11 +438,11 @@ function clampPointToRect(point, rect) {
   };
 }
 
-function nearestWalkablePoint(point) {
-  if (pointInWalkable(point)) return point;
+function nearestWalkablePoint(point, scene = activeScene()) {
+  if (pointInWalkable(point, scene)) return point;
   let best = null;
   let bestDistance = Infinity;
-  activeScene().walkableRects.forEach((rect) => {
+  scene.walkableRects.forEach((rect) => {
     const candidate = clampPointToRect(point, rect);
     const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y);
     if (distance < bestDistance) {
@@ -449,7 +450,14 @@ function nearestWalkablePoint(point) {
       bestDistance = distance;
     }
   });
-  return best || activeScene().entry;
+  return best || scene.entry;
+}
+
+function zoneInteractionPoint(zone, scene = activeScene()) {
+  if (zone.interactionPoint) return nearestWalkablePoint(zone.interactionPoint, scene);
+  if (zone.point) return nearestWalkablePoint(zone.point, scene);
+  const bounds = zoneBounds(zone);
+  return nearestWalkablePoint({ x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h }, scene);
 }
 
 function resizeCanvas() {
@@ -993,6 +1001,9 @@ function setPreview(zone) {
   state.preview = { zone, text: zone.preview };
   el.currentTask.textContent = zone.preview;
   el.previewHint.textContent = "短暂预览";
+  if (!state.working) {
+    moveAgentTo(zoneInteractionPoint(zone), null);
+  }
   setBubble(zone.bubble, 2600);
   toast(`${zone.label}状态预览，真实状态未改变`);
   state.previewTimer = window.setTimeout(() => {
@@ -1005,7 +1016,7 @@ function handleYardAction(zone) {
   clearTimeout(state.previewTimer);
   state.preview = null;
   activeAgent().realStatus = zone.real;
-  moveAgentTo(zone.point, zone.real);
+  moveAgentTo(zoneInteractionPoint(zone), zone.real);
   setBubble(zone.bubble, 2600);
   toast(`${zone.label}是院子页面交互，不会触发工作任务`);
 }
@@ -1020,7 +1031,7 @@ function navigateViaZone(zone) {
   state.preview = null;
   state.hotspotPulse = { zone, until: Date.now() + 900 };
   setBubble(zone.bubble, 1800);
-  moveAgentTo(zone.point, zone.type === "navigate" ? `前往${zone.label}` : zone.real, { showTarget: false });
+  moveAgentTo(zoneInteractionPoint(zone), zone.type === "navigate" ? `前往${zone.label}` : zone.real, { showTarget: false });
   state.navigationTimer = window.setTimeout(() => {
     setScene(zone.to, { status: zone.real, bubble: zone.bubble });
   }, state.agent.moveMs + 220);
@@ -1081,7 +1092,7 @@ function sendPrompt() {
     }
     setBubble("我在，听你说。");
     activeAgent().realStatus = "在客厅聊天";
-    moveAgentTo(findZoneByAction("indoor", "preview_idle", "livingSofa").point, activeAgent().realStatus);
+    moveAgentTo(zoneInteractionPoint(findZoneByAction("indoor", "preview_idle", "livingSofa")), activeAgent().realStatus);
     return;
   }
   startTask(text, kind);
@@ -1102,7 +1113,7 @@ function startTask(prompt, kind) {
   const zone = targetZoneForTask(kind);
   const status = zone.real;
   activeAgent().realStatus = status;
-  moveAgentTo(zone.point, status, { working: kind !== "rest" && kind !== "plan" });
+  moveAgentTo(zoneInteractionPoint(zone), status, { working: kind !== "rest" && kind !== "plan" });
   setBubble(kind === "rest" ? "我去休息一下" : "收到，我去对应区域处理");
   window.setTimeout(() => {
     if (kind === "rest") {

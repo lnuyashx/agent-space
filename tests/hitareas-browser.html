@@ -80,6 +80,10 @@
         return zoneShapes(zone).some((shape) => pointInShape(point, shape));
       }
 
+      function pointInWalkable(point, scene) {
+        return scene.walkableRects.some((rect) => pointInRect(point, rect));
+      }
+
       function zoneAt(point) {
         return (
           Object.entries(indoor.placedObjects)
@@ -272,6 +276,16 @@
             assert(
               hit?.objectId !== testCase.objectId,
               `${testCase.label} old-corner miss failed at ${name}: still hit ${testCase.objectId}`,
+            );
+          });
+        });
+
+        Object.entries(window.AGENT_SPACE_DATA.scenes).forEach(([sceneId, scene]) => {
+          Object.entries(scene.placedObjects).forEach(([objectId, zone]) => {
+            assert(Boolean(zone.interactionPoint), `${sceneId}.${objectId} is missing interactionPoint`);
+            assert(
+              pointInWalkable(zone.interactionPoint, scene),
+              `${sceneId}.${objectId} interactionPoint is outside walkable space`,
             );
           });
         });

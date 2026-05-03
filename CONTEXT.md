@@ -45,6 +45,7 @@ Current data model:
 - `inventory`: current owned items
 - `scenes`: indoor and yard
 - `placedObjects`: bed, sofa, TV, bookshelf, desk, door, kitchen, farm plots, mailbox
+- `placedObjects[].interactionPoint`: walkable anchor where the agent stands after clicking or targeting an object
 - `walkableRects`: temporary walkable areas for static backgrounds
 - `agents`: Aria/Luna/Mika initial states
 - `farm`: crop lifecycle, plot snapshot shape, owner actions, neighbor actions, social sync rules
@@ -57,6 +58,7 @@ Current data model:
 - Door navigation: click door -> agent walks to door -> switches to yard
 - Object-body hover/click overlay based on `hitAreas`, not broad room rectangles
 - Click ground to move; invalid floor clicks snap to nearest walkable area
+- Click objects to move the agent to object-specific walkable interaction anchors
 - Agent walking animation: facing flip, bob, target ring
 - Conversation dock and HUD
 - Artifact drawer
@@ -115,6 +117,7 @@ When continuing this demo, keep the same architecture:
 - Current save key is `agent-space-demo-save`; old `agent-space-demo-save-v1` can be read and is removed after the next successful v2 save.
 - Hotspots must stay aligned with the visible art object they represent.
 - New objects should use `hitAreas` polygons/rects/ellipses that trace the actual art body.
+- New interactive objects should define a walkable `interactionPoint` near the usable side of the object; movement should route through `zoneInteractionPoint()` instead of raw hit area points.
 - Decoration changes should update `placedObjects[].itemId`, then the renderer should decide how to show the new item.
 
 ## Collaboration
