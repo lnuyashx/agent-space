@@ -13,24 +13,25 @@ The long-term product should use:
 - placed objects saved per user room
 - scene snapshots for neighbor visits
 
-The current canvas demo keeps the static background for visual speed, but the interaction data has been moved into `data/game-data.js` so the model already matches the future architecture.
+The current canvas demo keeps the static background for visual speed, but the interaction data has been moved into `data/` modules so the model already matches the future architecture.
 
 ## Data Layers
 
-`data/game-data.js` currently owns:
+The current browser data entrypoint is still `window.AGENT_SPACE_DATA`, but it is composed from smaller classic-script modules:
 
-- `assets`: scene backgrounds and character sprite paths
-- `itemCatalog`: sellable or system items, such as beds, desks, doors, farm plots, mailbox
+- `data/assets.js`: scene backgrounds and character sprite paths
+- `data/item-catalog.js`: sellable or system items, such as beds, desks, doors, farm plots, mailbox
 - `itemCatalog[].price`: local-demo coin price for shop validation
 - `itemCatalog[].visual`: temporary drawing metadata for the static-background prototype
-- `inventory`: what the current user owns
-- `scenes`: the user's home and yard scene data
+- `data/inventory.js`: what the current user owns
+- `data/scenes.js`: the user's home and yard scene data
 - `placedObjects`: furniture / fixtures / farm objects placed in each scene
 - `walkableRects`: temporary walkable areas for this static-background prototype
-- `agents`: initial agent states
+- `data/agents.js`: initial agent states
+- `data/game-data.js`: compatibility composer that validates required modules and exposes `window.AGENT_SPACE_DATA`
 - `localStorage`: current demo persistence for inventory coins, owned items, and placed object item ids
 
-In production this file should split into:
+In production these browser script modules should become:
 
 - `items.json`: global item catalog from backend / CDN
 - `inventory`: user-owned items from Local Bridge / Hub
