@@ -6,5 +6,12 @@ window.AGENT_SPACE_DATA_MODULES.assets = {
   "scenes": {
     "indoor": "./assets/scene-indoor-v2.png",
     "yard": "./assets/scene-yard.png"
+  },
+  "atlases": {
+    "furniturePrototype": {
+      "key": "prototype-furniture",
+      "image": null,
+      "status": "metadata-only"
+    }
   }
 };

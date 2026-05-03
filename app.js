@@ -408,12 +408,18 @@ function catalogItemsForSlot(slot) {
   return Object.entries(gameData.itemCatalog).filter(([itemId, item]) => item.slots?.includes(slot) && item.actions?.includes("decorate_replace"));
 }
 
-function itemVisual(item) {
-  return item?.visual || { color: "#d96f42", accent: "#fff3d8", short: "ITEM" };
+function itemSprite(item) {
+  const fallback = item?.sprite?.fallback || { kind: item?.category || "item", color: "#d96f42", accent: "#fff3d8", short: "ITEM" };
+  return {
+    atlasKey: item?.sprite?.atlasKey || "prototype-furniture",
+    spriteId: item?.sprite?.spriteId || `${fallback.kind}.fallback`,
+    anchor: item?.sprite?.anchor || { x: 0.5, y: 1 },
+    fallback,
+  };
 }
 
 function swatchMarkup(item) {
-  const visual = itemVisual(item);
+  const visual = itemSprite(item).fallback;
   return `<span class="decor-swatch" style="--swatch:${visual.color}; --swatch-accent:${visual.accent};"></span>`;
 }
 
@@ -585,7 +591,9 @@ function drawObjectLayer() {
 }
 
 function drawPixelFurniture(zone, item, options) {
-  const visual = itemVisual(item);
+  const sprite = itemSprite(item);
+  const visual = sprite.fallback;
+  const spriteKind = visual.kind || item?.category;
   const bounds = zoneBounds(zone);
   const p1 = sceneToCanvas({ x: bounds.x, y: bounds.y });
   const p2 = sceneToCanvas({ x: bounds.x + bounds.w, y: bounds.y + bounds.h });
@@ -605,12 +613,12 @@ function drawPixelFurniture(zone, item, options) {
   ctx.ellipse(0, 34, 44, 9, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  if (item?.category === "bed") drawBedSprite(visual);
-  else if (item?.category === "sofa") drawSofaSprite(visual);
-  else if (item?.category === "bookshelf") drawBookshelfSprite(visual);
-  else if (item?.category === "desk") drawDeskSprite(visual, visual.short === "DUAL");
-  else if (item?.category === "kitchen") drawKitchenSprite(visual);
-  else if (item?.category === "tv") drawTvSprite(visual);
+  if (spriteKind === "bed") drawBedSprite(visual);
+  else if (spriteKind === "sofa") drawSofaSprite(visual);
+  else if (spriteKind === "bookshelf") drawBookshelfSprite(visual);
+  else if (spriteKind === "desk") drawDeskSprite(visual, visual.variant === "dual-monitor");
+  else if (spriteKind === "kitchen") drawKitchenSprite(visual);
+  else if (spriteKind === "tv") drawTvSprite(visual);
   else drawGenericItemSprite(visual);
 
   if (options.changed || state.decorating) {
@@ -618,7 +626,7 @@ function drawPixelFurniture(zone, item, options) {
     ctx.fillStyle = "#2d251e";
     ctx.font = "bold 10px ui-sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(visual.short, 0, 47);
+    ctx.fillText(visual.short || sprite.spriteId, 0, 47);
   }
   ctx.restore();
 }
