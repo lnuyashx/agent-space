@@ -25,6 +25,7 @@
     <script src="../data/scenes.js"></script>
     <script src="../data/agents.js"></script>
     <script src="../data/farm-model.js"></script>
+    <script src="../data/theme-bundles.js"></script>
     <script src="../data/game-data.js"></script>
     <script>
       const indoor = window.AGENT_SPACE_DATA.scenes.indoor;
@@ -100,9 +101,11 @@
         assert(Boolean(modules?.scenes), "scenes module should be loaded");
         assert(Boolean(modules?.agents), "agents module should be loaded");
         assert(Boolean(modules?.farm), "farm module should be loaded");
+        assert(Boolean(modules?.themeBundles), "themeBundles module should be loaded");
         assert(window.AGENT_SPACE_DATA.itemCatalog === modules.itemCatalog, "composed data should reuse itemCatalog module");
         assert(window.AGENT_SPACE_DATA.scenes === modules.scenes, "composed data should reuse scenes module");
         assert(window.AGENT_SPACE_DATA.farm === modules.farm, "composed data should reuse farm module");
+        assert(window.AGENT_SPACE_DATA.themeBundles === modules.themeBundles, "composed data should reuse themeBundles module");
       }
 
       function assertFarmModel() {
@@ -129,6 +132,38 @@
           assert(Boolean(zone.farmPlotId), `${objectId} should map to a farmPlotId`);
           assert(farm.lifecycle.includes(zone.defaultFarmStateId), `${objectId} should map to a valid default farm state`);
         });
+      }
+
+      function assertThemeBundleModel() {
+        const model = window.AGENT_SPACE_DATA.themeBundles;
+        assert(model.schemaVersion === 1, "theme bundle model should expose schemaVersion 1");
+        ["id", "label", "sceneId", "styleTokens", "compatibleSlots", "rendererRequirements"].forEach((field) => {
+          assert(model.themeFields.required.includes(field), `theme fields should require ${field}`);
+        });
+        ["warmStarter", "oceanFocus", "creatorStudio"].forEach((themeId) => {
+          const theme = model.themes[themeId];
+          assert(Boolean(theme), `theme model should define ${themeId}`);
+          assert(Boolean(window.AGENT_SPACE_DATA.scenes[theme.sceneId]), `${themeId} should point to an existing scene`);
+          assert(Array.isArray(theme.compatibleSlots) && theme.compatibleSlots.length > 0, `${themeId} should define compatible slots`);
+          assert(Boolean(theme.rendererRequirements?.pixi), `${themeId} should document PixiJS renderer requirements`);
+        });
+        Object.entries(model.bundles).forEach(([bundleId, bundle]) => {
+          assert(Boolean(model.themes[bundle.themeId]), `${bundleId} should point to an existing theme`);
+          bundle.grantItems.forEach((itemId) => {
+            assert(Boolean(window.AGENT_SPACE_DATA.itemCatalog[itemId]), `${bundleId} grants missing item ${itemId}`);
+          });
+          Object.entries(bundle.equipPlan).forEach(([objectId, itemId]) => {
+            const zone = window.AGENT_SPACE_DATA.scenes[bundle.sceneId].placedObjects[objectId];
+            const item = window.AGENT_SPACE_DATA.itemCatalog[itemId];
+            assert(Boolean(zone), `${bundleId} targets missing placed object ${objectId}`);
+            assert(item.slots.includes(zone.slot), `${bundleId} item ${itemId} should support slot ${zone.slot}`);
+          });
+        });
+        ["locked", "owned", "equipped"].forEach((state) => {
+          assert(model.ownershipFlow.some((step) => step.state === state), `ownership flow should define ${state}`);
+        });
+        assert(model.equipFlow.equipWrites.includes("sceneSnapshot[sceneId].themeId"), "equip flow should write sceneSnapshot themeId");
+        assert(model.dependencies.renderer.includes("surface theme layers"), "theme model should document renderer dependency");
       }
 
       const cases = [
@@ -221,6 +256,7 @@
       try {
         assertDataModules();
         assertFarmModel();
+        assertThemeBundleModel();
 
         cases.forEach((testCase) => {
           testCase.bodyHits.forEach(({ name, point }) => {

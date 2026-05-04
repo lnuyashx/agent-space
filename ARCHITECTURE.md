@@ -29,6 +29,7 @@ The current browser data entrypoint is still `window.AGENT_SPACE_DATA`, but it i
 - `walkableRects`: temporary walkable areas for this static-background prototype
 - `data/agents.js`: initial agent states
 - `data/farm-model.js`: crop lifecycle, plot snapshot shape, owner actions, neighbor actions, and social sync rules
+- `data/theme-bundles.js`: room theme fields, furniture bundle grants, ownership/equip flow, and renderer/data dependencies
 - `data/game-data.js`: compatibility composer that validates required modules and exposes `window.AGENT_SPACE_DATA`
 - `localStorage`: current demo persistence for inventory coins, owned items, and placed object item ids
 
@@ -39,6 +40,8 @@ In production these browser script modules should become:
 - `sceneSnapshot`: user's placed room objects
 - `sceneTemplate`: default room slots and allowed placement rules
 - `farmSnapshot`: plot state keyed by stable `farmPlotId`
+- `themeCatalog` / `bundleCatalog`: sellable themes and furniture packs
+- `sceneSnapshot.themeId`: equipped room theme id
 
 ## Placed Object Shape
 
@@ -163,3 +166,15 @@ The yard farm model is intentionally data-first. `data/farm-model.js` defines:
 - a default plot snapshot shape for later persistence
 
 Current yard fields in `data/scenes.js` only map visual objects to stable `farmPlotId` values. Future gameplay should save farm progress by `farmPlotId`, not by canvas coordinates or temporary hit-area geometry.
+
+## Theme And Bundle Model
+
+The room theme model is also data-first. `data/theme-bundles.js` defines:
+
+- theme fields: `id`, `sceneId`, `styleTokens`, compatible slots, and renderer requirements
+- furniture bundles that grant catalog items and carry a recommended `equipPlan`
+- ownership states: `locked`, `owned`, `equipped`
+- purchase writes to `ownedBundles`, `ownedThemes`, and item inventory
+- equip writes to `sceneSnapshot[sceneId].themeId` and compatible `placedObjects`
+
+The current static background cannot render wall/floor theme swaps yet. Production PixiJS needs surface layers, preview snapshots, and sprite atlas variants before themes can become fully visual.

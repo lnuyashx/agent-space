@@ -28,6 +28,7 @@ Main files:
 - `data/scenes.js`
 - `data/agents.js`
 - `data/farm-model.js`
+- `data/theme-bundles.js`
 - `data/game-data.js`
 - `ARCHITECTURE.md`
 - `README.md`
@@ -47,6 +48,7 @@ Current data model:
 - `walkableRects`: temporary walkable areas for static backgrounds
 - `agents`: Aria/Luna/Mika initial states
 - `farm`: crop lifecycle, plot snapshot shape, owner actions, neighbor actions, social sync rules
+- `themeBundles`: room themes, furniture bundles, ownership/equip flow, renderer/data dependencies
 - `data/game-data.js`: compatibility composer that exposes `window.AGENT_SPACE_DATA` from `window.AGENT_SPACE_DATA_MODULES`
 
 ## Implemented Features
@@ -69,6 +71,7 @@ Current data model:
 - Local shop loop: unowned compatible furniture appears in the same drawer, can be bought with demo coins, then equipped
 - Browser `localStorage` save: owned items, coins, and scene placed-object item ids persist across refresh
 - Farm plot state model: `empty -> seeded -> growing -> ready -> withered`, with owner actions and neighbor actions documented in `docs/farm-plot-state-model.zh-CN.md`
+- Room theme and bundle model: themes define style tokens and renderer requirements; bundles grant furniture and write `sceneSnapshot.themeId` plus placed object item ids
 
 ## Current Limitation
 
@@ -101,6 +104,7 @@ When continuing this demo, keep the same architecture:
 - `scenes[].placedObjects` describes what is actually placed in a room.
 - Data files are loaded as classic browser scripts: module slices populate `window.AGENT_SPACE_DATA_MODULES`, and `data/game-data.js` composes the legacy app entrypoint.
 - Farm plot objects should use stable `farmPlotId` values; future saves should store farm snapshots by that id rather than by canvas position.
+- Theme bundle ownership should stay separate from item ownership; equipping a bundle writes a theme id plus compatible slot item ids.
 - Local demo persistence uses `localStorage`; production should replace it with Local Bridge / SQLite / Hub sync.
 - Hotspots must stay aligned with the visible art object they represent.
 - New objects should use `hitAreas` polygons/rects/ellipses that trace the actual art body.
