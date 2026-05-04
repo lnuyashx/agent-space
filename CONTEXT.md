@@ -22,6 +22,11 @@ Main files:
 - `index.html`
 - `styles.css`
 - `app.js`
+- `data/assets.js`
+- `data/item-catalog.js`
+- `data/inventory.js`
+- `data/scenes.js`
+- `data/agents.js`
 - `data/game-data.js`
 - `ARCHITECTURE.md`
 - `README.md`
@@ -40,6 +45,7 @@ Current data model:
 - `placedObjects`: bed, sofa, TV, bookshelf, desk, door, kitchen, farm plots, mailbox
 - `walkableRects`: temporary walkable areas for static backgrounds
 - `agents`: Aria/Luna/Mika initial states
+- `data/game-data.js`: compatibility composer that exposes `window.AGENT_SPACE_DATA` from `window.AGENT_SPACE_DATA_MODULES`
 
 ## Implemented Features
 
@@ -90,6 +96,7 @@ When continuing this demo, keep the same architecture:
 - `itemCatalog` describes what can be owned or sold.
 - `inventory` describes what the user owns.
 - `scenes[].placedObjects` describes what is actually placed in a room.
+- Data files are loaded as classic browser scripts: module slices populate `window.AGENT_SPACE_DATA_MODULES`, and `data/game-data.js` composes the legacy app entrypoint.
 - Local demo persistence uses `localStorage`; production should replace it with Local Bridge / SQLite / Hub sync.
 - Hotspots must stay aligned with the visible art object they represent.
 - New objects should use `hitAreas` polygons/rects/ellipses that trace the actual art body.

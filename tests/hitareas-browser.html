@@ -19,6 +19,11 @@
   <body>
     <h1>Agent Space Hit Area Assertions</h1>
     <pre id="report">Running...</pre>
+    <script src="../data/assets.js"></script>
+    <script src="../data/item-catalog.js"></script>
+    <script src="../data/inventory.js"></script>
+    <script src="../data/scenes.js"></script>
+    <script src="../data/agents.js"></script>
     <script src="../data/game-data.js"></script>
     <script>
       const indoor = window.AGENT_SPACE_DATA.scenes.indoor;
@@ -83,6 +88,17 @@
       function assert(condition, message) {
         assertions.push({ pass: Boolean(condition), message });
         if (!condition) throw new Error(message);
+      }
+
+      function assertDataModules() {
+        const modules = window.AGENT_SPACE_DATA_MODULES;
+        assert(Boolean(modules?.assets), "assets module should be loaded");
+        assert(Boolean(modules?.itemCatalog), "itemCatalog module should be loaded");
+        assert(Boolean(modules?.inventory), "inventory module should be loaded");
+        assert(Boolean(modules?.scenes), "scenes module should be loaded");
+        assert(Boolean(modules?.agents), "agents module should be loaded");
+        assert(window.AGENT_SPACE_DATA.itemCatalog === modules.itemCatalog, "composed data should reuse itemCatalog module");
+        assert(window.AGENT_SPACE_DATA.scenes === modules.scenes, "composed data should reuse scenes module");
       }
 
       const cases = [
@@ -173,6 +189,8 @@
       ];
 
       try {
+        assertDataModules();
+
         cases.forEach((testCase) => {
           testCase.bodyHits.forEach(({ name, point }) => {
             const hit = zoneAt(point);

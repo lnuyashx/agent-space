@@ -31,7 +31,7 @@
 - `assets/scene-study.png`、`assets/scene-kitchen.png`、`assets/scene-bedroom.png`、`assets/scene-studio.png` 是新增独立房间底图
 - `assets/aria-agent.png` 是透明 agent 角色素材
 - `assets/generated-room-backdrop.png` 保留为早期概念参考素材
-- `data/game-data.js` 是当前 demo 的数据模型入口，包含资产、物品目录、库存、场景、摆放对象和 agent 初始状态
+- `data/*.js` 是当前 demo 的数据模型；`assets.js`、`item-catalog.js`、`inventory.js`、`scenes.js`、`agents.js` 分别维护数据切片，`game-data.js` 只负责组合成兼容入口 `window.AGENT_SPACE_DATA`
 - `ARCHITECTURE.md` 记录从当前 demo 迁移到 PixiJS / 装修 / 商城 / 邻居串门的推荐路线
 - `docs/collaboration-overview.zh-CN.md` 记录 GitHub Issues / 分支 / 锁 / PR 的多 agent 协作方案
 - `AGENTS.md` 和 `STATUS.md` 是新 session 的入口文件
@@ -46,7 +46,7 @@
 
 ## 交互架构
 
-当前 demo 把一张背景图拆成五层处理，但交互数据已经从 `app.js` 抽到 `data/game-data.js`：
+当前 demo 把一张背景图拆成五层处理，但交互数据已经从 `app.js` 抽到 `data/` 下的分层数据文件：
 
 1. 背景层：`scene-indoor-v2.png` / `scene-yard.png`
 2. 物品层：`itemCatalog` 定义可售卖/可替换物品，比如床、沙发、电脑桌、农田；当前带 `price` 和临时 `visual` 字段
@@ -75,6 +75,7 @@
 - `placedObjects`：每个家具实例的摆放位置、槽位、碰撞和交互
 
 当前 demo 用 `localStorage` 存这些数据，正式版再替换成 Local Bridge / SQLite / Hub 同步。
+当前浏览器加载顺序是数据切片先挂到 `window.AGENT_SPACE_DATA_MODULES`，再由 `data/game-data.js` 组合为旧入口，保证 `app.js` 和旧测试不需要理解每个切片文件。
 
 ## 明确延后
 
@@ -89,7 +90,7 @@
 
 ```sh
 node --check app.js
-node --check data/game-data.js
+for file in data/*.js; do node --check "$file"; done
 scripts/check-hitareas.sh
 ```
 

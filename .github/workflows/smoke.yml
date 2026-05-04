@@ -22,4 +22,7 @@ jobs:
         run: node --check app.js
 
       - name: Check data syntax
-        run: node --check data/game-data.js
+        run: |
+          for file in data/*.js; do
+            node --check "$file"
+          done
