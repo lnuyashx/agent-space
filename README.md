@@ -24,6 +24,7 @@
 - 工作可视化：接任务、走到工作位、工作中、完成标记、Artifact 抽屉
 - 院子交互：农田、信箱等是院子页面交互，不触发 agent 工作任务
 - 农田状态模型：`data/farm-model.js` 定义空地、播种、生长、可收获、枯萎生命周期，以及主人/邻居动作边界
+- 房间主题 / 家具包模型：`data/theme-bundles.js` 定义主题字段、bundle 授权、装备写入和渲染依赖
 - `assets/scene-indoor-v2.png` 是当前室内整屋背景
 - `assets/scene-yard.png` 是当前院子背景
 - `assets/aria-agent-v2.png` 是当前原创 anime agent 角色素材
@@ -32,7 +33,7 @@
 - `assets/scene-study.png`、`assets/scene-kitchen.png`、`assets/scene-bedroom.png`、`assets/scene-studio.png` 是新增独立房间底图
 - `assets/aria-agent.png` 是透明 agent 角色素材
 - `assets/generated-room-backdrop.png` 保留为早期概念参考素材
-- `data/*.js` 是当前 demo 的数据模型；`assets.js`、`item-catalog.js`、`inventory.js`、`scenes.js`、`agents.js`、`farm-model.js` 分别维护数据切片，`game-data.js` 只负责组合成兼容入口 `window.AGENT_SPACE_DATA`
+- `data/*.js` 是当前 demo 的数据模型；`assets.js`、`item-catalog.js`、`inventory.js`、`scenes.js`、`agents.js`、`farm-model.js`、`theme-bundles.js` 分别维护数据切片，`game-data.js` 只负责组合成兼容入口 `window.AGENT_SPACE_DATA`
 - `ARCHITECTURE.md` 记录从当前 demo 迁移到 PixiJS / 装修 / 商城 / 邻居串门的推荐路线
 - `docs/collaboration-overview.zh-CN.md` 记录 GitHub Issues / 分支 / 锁 / PR 的多 agent 协作方案
 - `AGENTS.md` 和 `STATUS.md` 是新 session 的入口文件
@@ -75,6 +76,7 @@
 - `sceneSnapshot`：用户当前房间装修快照
 - `placedObjects`：每个家具实例的摆放位置、槽位、碰撞和交互
 - `farm`：农田生命周期、作物目录、主人动作、邻居动作和地块快照形状；详见 `docs/farm-plot-state-model.zh-CN.md`
+- `themeBundles`：房间主题、家具包、所有权状态和装备流程；详见 `docs/room-theme-bundle-model.zh-CN.md`
 
 当前 demo 用 `localStorage` 存这些数据，正式版再替换成 Local Bridge / SQLite / Hub 同步。
 当前浏览器加载顺序是数据切片先挂到 `window.AGENT_SPACE_DATA_MODULES`，再由 `data/game-data.js` 组合为旧入口，保证 `app.js` 和旧测试不需要理解每个切片文件。
