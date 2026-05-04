@@ -1,4 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, TextStyle } from "pixi.js";
+import type { Texture } from "pixi.js";
 import type { AgentSpaceData, AgentSpacePlacedObject, AgentSpacePoint, AgentSpaceScene } from "../types";
 
 interface PixiFoundationOptions {
@@ -43,15 +44,21 @@ export async function bootstrapPixiFoundation(options: PixiFoundationOptions): P
 
   const renderer = new PixiScenePreview(app, data, stageHost);
   await renderer.load();
-  renderer.render();
+  await renderer.render();
 
-  window.addEventListener("resize", () => renderer.render());
-  window.addEventListener("hashchange", () => renderer.render());
+  const render = () => {
+    renderer.render().catch((error: unknown) => {
+      console.warn("PixiJS foundation render failed", error);
+    });
+  };
+  window.addEventListener("resize", render);
+  window.addEventListener("hashchange", render);
 }
 
 class PixiScenePreview {
   private readonly world = new Container();
   private readonly labels = new Container();
+  private readonly sceneTextures = new Map<string, Texture>();
   private sceneSprite?: Sprite;
   private agentSprite?: Sprite;
 
@@ -66,8 +73,7 @@ class PixiScenePreview {
 
   async load(): Promise<void> {
     const scene = this.activeScene();
-    const scenePath = this.data.assets.scenes[scene.assetId];
-    const [sceneTexture, agentTexture] = await Promise.all([Assets.load(scenePath), Assets.load(this.data.assets.agent)]);
+    const [sceneTexture, agentTexture] = await Promise.all([this.sceneTexture(scene), Assets.load(this.data.assets.agent)]);
 
     this.sceneSprite = new Sprite(sceneTexture);
     this.world.addChild(this.sceneSprite);
@@ -77,13 +83,15 @@ class PixiScenePreview {
     this.world.addChild(this.agentSprite);
   }
 
-  render(): void {
+  async render(): Promise<void> {
     const scene = this.activeScene();
+    const sceneTexture = await this.sceneTexture(scene);
     const bounds = this.stageBounds();
     this.labels.removeChildren();
     this.world.removeChildren();
 
     if (this.sceneSprite) {
+      this.sceneSprite.texture = sceneTexture;
       const cover = coverRect(this.sceneSprite.texture.width, this.sceneSprite.texture.height, bounds.width, bounds.height);
       this.sceneSprite.position.set(cover.x, cover.y);
       this.sceneSprite.width = cover.width;
@@ -94,6 +102,20 @@ class PixiScenePreview {
       this.drawAgent(scene, cover);
       this.drawModeLabel(bounds);
     }
+  }
+
+  private async sceneTexture(scene: AgentSpaceScene): Promise<Texture> {
+    const cached = this.sceneTextures.get(scene.assetId);
+    if (cached) return cached;
+
+    const scenePath = this.data.assets.scenes[scene.assetId];
+    if (!scenePath) {
+      throw new Error(`Missing scene asset path for ${scene.assetId}`);
+    }
+
+    const texture = await Assets.load<Texture>(scenePath);
+    this.sceneTextures.set(scene.assetId, texture);
+    return texture;
   }
 
   private drawObjects(scene: AgentSpaceScene, cover: CoverRect): void {
@@ -209,4 +231,3 @@ function parseCssColor(value: string): number {
   const parsed = Number.parseInt(normalized.length === 3 ? normalized.replace(/(.)/g, "$1$1") : normalized, 16);
   return Number.isFinite(parsed) ? parsed : 0xd96f42;
 }
-
