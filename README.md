@@ -96,6 +96,9 @@
 node --check app.js
 for file in data/*.js; do node --check "$file"; done
 scripts/check-hitareas.sh
+scripts/check-smoke.sh
 ```
 
 `scripts/check-hitareas.sh` 会用 headless Chrome / Chromium 打开 `tests/hitareas-browser.html`，验证室内物体主体命中和旧大角落误命中失效。
+
+`scripts/check-smoke.sh` 会用 headless Chrome / Chromium 打开真实 `index.html`，模拟启动、物件点击、门导航、装修抽屉、商城购买和刷新后的 `localStorage` 恢复。脚本默认不保存截图。

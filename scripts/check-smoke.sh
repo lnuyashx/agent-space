@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TEST_URL="file://${ROOT_DIR}/tests/hitareas-browser.html"
+TEST_URL="file://${ROOT_DIR}/tests/smoke-browser.html"
+VIRTUAL_TIME_BUDGET_MS="${SMOKE_VIRTUAL_TIME_BUDGET_MS:-12000}"
 
 if [[ -n "${CHROME_BIN:-}" ]]; then
   CHROME="$CHROME_BIN"
@@ -20,24 +21,34 @@ else
 fi
 
 set +e
-OUTPUT="$("$CHROME" --headless=new --disable-gpu --no-sandbox --dump-dom "$TEST_URL" 2>&1)"
+OUTPUT="$(
+  "$CHROME" \
+    --headless=new \
+    --disable-gpu \
+    --no-sandbox \
+    --allow-file-access-from-files \
+    --window-size=1360,960 \
+    --virtual-time-budget="$VIRTUAL_TIME_BUDGET_MS" \
+    --dump-dom \
+    "$TEST_URL" 2>&1
+)"
 CHROME_STATUS=$?
 set -e
 
 if [[ "$CHROME_STATUS" -ne 0 ]]; then
   printf '%s\n' "$OUTPUT"
-  echo "Chrome hit area check exited with status ${CHROME_STATUS}." >&2
+  echo "Chrome smoke check exited with status ${CHROME_STATUS}." >&2
   exit "$CHROME_STATUS"
 fi
 
-if ! grep -q "<title>PASS Agent Space Hit Areas</title>" <<<"$OUTPUT"; then
-  echo "Hit area browser assertions failed." >&2
+if ! grep -q "<title>PASS Agent Space Smoke</title>" <<<"$OUTPUT"; then
   printf '%s\n' "$OUTPUT"
+  echo "Smoke browser assertions failed." >&2
   exit 1
 fi
 
-echo "HITAREA_TEST_PASS"
-SUMMARY="$(grep -Eo '[0-9]+ browser assertions passed\.' <<<"$OUTPUT" | head -n 1 || true)"
+echo "SMOKE_TEST_PASS"
+SUMMARY="$(grep -Eo '[0-9]+ smoke assertions passed\.' <<<"$OUTPUT" | head -n 1 || true)"
 if [[ -n "$SUMMARY" ]]; then
   echo "$SUMMARY"
 fi

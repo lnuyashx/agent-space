@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Agent Space Smoke Assertions</title>
+    <style>
+      body {
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 24px;
+        color: #241d18;
+        background: #fffaf2;
+      }
+
+      pre {
+        white-space: pre-wrap;
+      }
+
+      iframe {
+        width: 1280px;
+        height: 848px;
+        border: 1px solid rgba(112, 83, 58, 0.24);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Agent Space Smoke Assertions</h1>
+    <pre id="report">Running...</pre>
+    <iframe id="appFrame" title="Agent Space smoke target"></iframe>
+
+    <script>
+      const SAVE_KEYS = ["agent-space-demo-save", "agent-space-demo-save-v1"];
+      const report = document.querySelector("#report");
+      const frame = document.querySelector("#appFrame");
+      const assertions = [];
+      const log = [];
+
+      function setReport(status, detail) {
+        report.textContent = `${status}\n${detail}`;
+        document.title = `${status === "SMOKE_TEST_PASS" ? "PASS" : "FAIL"} Agent Space Smoke`;
+      }
+
+      function assert(condition, message) {
+        assertions.push({ pass: Boolean(condition), message });
+        if (!condition) throw new Error(message);
+      }
+
+      function pass(message) {
+        assert(true, message);
+        log.push(`PASS ${message}`);
+      }
+
+      function text(doc, selector) {
+        return doc.querySelector(selector)?.textContent.trim() || "";
+      }
+
+      function clearSaveKeys(storage) {
+        SAVE_KEYS.forEach((key) => storage.removeItem(key));
+      }
+
+      function readSavedState(storage) {
+        const key = SAVE_KEYS.find((candidate) => storage.getItem(candidate));
+        assert(Boolean(key), `No save payload found in ${SAVE_KEYS.join(", ")}`);
+        return {
+          key,
+          payload: JSON.parse(storage.getItem(key) || "{}"),
+        };
+      }
+
+      function loadApp(label) {
+        return new Promise((resolve, reject) => {
+          const timeout = window.setTimeout(() => reject(new Error(`Timed out loading app frame for ${label}`)), 2500);
+          frame.onload = () => {
+            window.clearTimeout(timeout);
+            try {
+              resolve({ win: frame.contentWindow, doc: frame.contentWindow.document });
+            } catch (error) {
+              reject(error);
+            }
+          };
+          frame.src = `../index.html?smoke=${encodeURIComponent(label)}-${Date.now()}`;
+        });
+      }
+
+      function waitFor(win, predicate, message, timeoutMs = 4000) {
+        return new Promise((resolve, reject) => {
+          const started = Date.now();
+          function tick() {
+            try {
+              if (predicate()) {
+                resolve();
+                return;
+              }
+            } catch (error) {
+              reject(error);
+              return;
+            }
+            if (Date.now() - started > timeoutMs) {
+              reject(new Error(message));
+              return;
+            }
+            win.setTimeout(tick, 50);
+          }
+          tick();
+        });
+      }
+
+      function click(win, element) {
+        element.dispatchEvent(new win.MouseEvent("click", { bubbles: true, cancelable: true, view: win }));
+      }
+
+      function clickScenePoint(win, doc, point) {
+        const canvas = doc.querySelector("#worldCanvas");
+        const rect = canvas.getBoundingClientRect();
+        canvas.dispatchEvent(
+          new win.MouseEvent("click", {
+            bubbles: true,
+            cancelable: true,
+            view: win,
+            clientX: rect.left + point.x * rect.width,
+            clientY: rect.top + point.y * rect.height,
+          }),
+        );
+      }
+
+      function itemButton(doc, label) {
+        return Array.from(doc.querySelectorAll("#decorateItemList button")).find((button) => button.textContent.includes(label));
+      }
+
+      function setComposer(doc, mode, value) {
+        doc.querySelector("#intentSelect").value = mode;
+        doc.querySelector("#promptInput").value = value;
+      }
+
+      async function openDecorateDrawer(win, doc) {
+        click(win, doc.querySelector("#settingsBtn"));
+        await waitFor(
+          win,
+          () => doc.querySelector("#decorateDrawer")?.classList.contains("open") && doc.querySelectorAll("#decorateSlotList button").length > 0,
+          "Decoration drawer did not open with slots",
+        );
+      }
+
+      async function run() {
+        try {
+          clearSaveKeys(window.localStorage);
+
+          let app = await loadApp("initial");
+          let win = app.win;
+          let doc = app.doc;
+
+          await waitFor(
+            win,
+            () => doc.querySelector("#worldCanvas")?.width >= 720 && text(doc, "#currentTask") === "在客厅休息",
+            "App did not boot into the indoor idle state",
+          );
+          assert(text(doc, "#activeAgentName") === "Aria", "App did not boot with Aria selected");
+          pass("app booted");
+
+          clickScenePoint(win, doc, { x: 0.11, y: 0.56 });
+          await waitFor(
+            win,
+            () => text(doc, "#currentTask") === "预览：娱乐 / 摸鱼" && text(doc, "#previewHint") === "短暂预览",
+            "TV object body click did not trigger preview",
+          );
+          pass("object hit testing triggered TV preview");
+
+          clickScenePoint(win, doc, { x: 0.8, y: 0.53 });
+          await waitFor(
+            win,
+            () => win.location.hash === "#yard" && text(doc, "#currentTask") === "在院子里散步",
+            "Door click did not navigate to the yard",
+            4500,
+          );
+          pass("door navigation reached yard");
+
+          setComposer(doc, "goto", "回屋");
+          click(win, doc.querySelector("#sendBtn"));
+          await waitFor(
+            win,
+            () => win.location.hash === "" && text(doc, "#currentTask") === "在客厅休息",
+            "Composer movement did not return indoors",
+          );
+
+          await openDecorateDrawer(win, doc);
+          pass("decoration drawer opened");
+
+          const lavenderButton = itemButton(doc, "薰衣草云床");
+          assert(Boolean(lavenderButton), "Shop item 薰衣草云床 was not listed");
+          assert(lavenderButton.textContent.includes("SHOP"), "Unowned shop item was not marked as SHOP");
+          click(win, lavenderButton);
+          await waitFor(win, () => text(doc, "#coinValue") === "4", "Shop purchase did not update coins");
+
+          const { payload: saved } = readSavedState(win.localStorage);
+          assert(saved.inventory?.coins === 4, "Saved coin balance did not persist purchase");
+          assert(saved.inventory?.owned?.bed_lavender_cloud === 1, "Purchased bed was not persisted as owned");
+          assert(
+            saved.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_lavender_cloud",
+            "Placed bed replacement was not persisted",
+          );
+          pass("shop purchase and placed furniture persisted");
+
+          app = await loadApp("reload");
+          win = app.win;
+          doc = app.doc;
+
+          await waitFor(win, () => text(doc, "#coinValue") === "4", "Reload did not restore saved coin balance");
+          await openDecorateDrawer(win, doc);
+          assert(doc.querySelector("#decorateSlotList").textContent.includes("薰衣草云床"), "Reload did not restore placed furniture label");
+          pass("reload restored localStorage state");
+
+          clearSaveKeys(win.localStorage);
+          clearSaveKeys(window.localStorage);
+
+          const passed = assertions.filter((item) => item.pass).length;
+          setReport("SMOKE_TEST_PASS", `${passed} smoke assertions passed.\n${log.join("\n")}`);
+        } catch (error) {
+          setReport("SMOKE_TEST_FAIL", error.stack || error.message);
+        }
+      }
+
+      run();
+    </script>
+  </body>
+</html>
