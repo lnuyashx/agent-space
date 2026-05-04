@@ -28,7 +28,7 @@
     <iframe id="appFrame" title="Agent Space smoke target"></iframe>
 
     <script>
-      const SAVE_KEY = "agent-space-demo-save-v1";
+      const SAVE_KEYS = ["agent-space-demo-save", "agent-space-demo-save-v1"];
       const report = document.querySelector("#report");
       const frame = document.querySelector("#appFrame");
       const assertions = [];
@@ -51,6 +51,19 @@
 
       function text(doc, selector) {
         return doc.querySelector(selector)?.textContent.trim() || "";
+      }
+
+      function clearSaveKeys(storage) {
+        SAVE_KEYS.forEach((key) => storage.removeItem(key));
+      }
+
+      function readSavedState(storage) {
+        const key = SAVE_KEYS.find((candidate) => storage.getItem(candidate));
+        assert(Boolean(key), `No save payload found in ${SAVE_KEYS.join(", ")}`);
+        return {
+          key,
+          payload: JSON.parse(storage.getItem(key) || "{}"),
+        };
       }
 
       function loadApp(label) {
@@ -129,7 +142,7 @@
 
       async function run() {
         try {
-          window.localStorage.removeItem(SAVE_KEY);
+          clearSaveKeys(window.localStorage);
 
           let app = await loadApp("initial");
           let win = app.win;
@@ -177,7 +190,7 @@
           click(win, lavenderButton);
           await waitFor(win, () => text(doc, "#coinValue") === "4", "Shop purchase did not update coins");
 
-          const saved = JSON.parse(win.localStorage.getItem(SAVE_KEY) || "{}");
+          const { payload: saved } = readSavedState(win.localStorage);
           assert(saved.inventory?.coins === 4, "Saved coin balance did not persist purchase");
           assert(saved.inventory?.owned?.bed_lavender_cloud === 1, "Purchased bed was not persisted as owned");
           assert(
@@ -195,8 +208,8 @@
           assert(doc.querySelector("#decorateSlotList").textContent.includes("薰衣草云床"), "Reload did not restore placed furniture label");
           pass("reload restored localStorage state");
 
-          win.localStorage.removeItem(SAVE_KEY);
-          window.localStorage.removeItem(SAVE_KEY);
+          clearSaveKeys(win.localStorage);
+          clearSaveKeys(window.localStorage);
 
           const passed = assertions.filter((item) => item.pass).length;
           setReport("SMOKE_TEST_PASS", `${passed} smoke assertions passed.\n${log.join("\n")}`);
