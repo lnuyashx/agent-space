@@ -62,6 +62,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
           "x": 0.19,
           "y": 0.44
         },
+        "interactionPoint": {
+          "x": 0.31,
+          "y": 0.49
+        },
         "hitAreas": [
           {
             "type": "polygon",
@@ -107,6 +111,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
           "x": 0.34,
           "y": 0.74
         },
+        "interactionPoint": {
+          "x": 0.38,
+          "y": 0.67
+        },
         "hitAreas": [
           {
             "type": "polygon",
@@ -151,6 +159,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
         "point": {
           "x": 0.17,
           "y": 0.6
+        },
+        "interactionPoint": {
+          "x": 0.22,
+          "y": 0.69
         },
         "hitAreas": [
           {
@@ -218,6 +230,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
           "x": 0.48,
           "y": 0.37
         },
+        "interactionPoint": {
+          "x": 0.55,
+          "y": 0.52
+        },
         "hitAreas": [
           {
             "type": "polygon",
@@ -266,6 +282,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
         "point": {
           "x": 0.62,
           "y": 0.4
+        },
+        "interactionPoint": {
+          "x": 0.61,
+          "y": 0.49
         },
         "hitAreas": [
           {
@@ -379,6 +399,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
           "x": 0.82,
           "y": 0.34
         },
+        "interactionPoint": {
+          "x": 0.76,
+          "y": 0.52
+        },
         "hitAreas": [
           {
             "type": "polygon",
@@ -441,6 +465,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
         "point": {
           "x": 0.74,
           "y": 0.78
+        },
+        "interactionPoint": {
+          "x": 0.67,
+          "y": 0.73
         },
         "hitAreas": [
           {
@@ -548,6 +576,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
           "x": 0.54,
           "y": 0.31
         },
+        "interactionPoint": {
+          "x": 0.54,
+          "y": 0.31
+        },
         "hitAreas": [
           {
             "type": "polygon",
@@ -587,6 +619,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
         "point": {
           "x": 0.27,
           "y": 0.58
+        },
+        "interactionPoint": {
+          "x": 0.34,
+          "y": 0.55
         },
         "hitAreas": [
           {
@@ -631,6 +667,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
           "x": 0.76,
           "y": 0.58
         },
+        "interactionPoint": {
+          "x": 0.7,
+          "y": 0.55
+        },
         "hitAreas": [
           {
             "type": "polygon",
@@ -669,6 +709,10 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
         "preview": "院子：查看信箱",
         "real": "在院子查看信箱",
         "point": {
+          "x": 0.43,
+          "y": 0.65
+        },
+        "interactionPoint": {
           "x": 0.43,
           "y": 0.65
         },
