@@ -24,9 +24,11 @@
     <script src="../data/inventory.js"></script>
     <script src="../data/scenes.js"></script>
     <script src="../data/agents.js"></script>
+    <script src="../data/farm-model.js"></script>
     <script src="../data/game-data.js"></script>
     <script>
       const indoor = window.AGENT_SPACE_DATA.scenes.indoor;
+      const yard = window.AGENT_SPACE_DATA.scenes.yard;
       const report = document.querySelector("#report");
       const assertions = [];
 
@@ -97,8 +99,36 @@
         assert(Boolean(modules?.inventory), "inventory module should be loaded");
         assert(Boolean(modules?.scenes), "scenes module should be loaded");
         assert(Boolean(modules?.agents), "agents module should be loaded");
+        assert(Boolean(modules?.farm), "farm module should be loaded");
         assert(window.AGENT_SPACE_DATA.itemCatalog === modules.itemCatalog, "composed data should reuse itemCatalog module");
         assert(window.AGENT_SPACE_DATA.scenes === modules.scenes, "composed data should reuse scenes module");
+        assert(window.AGENT_SPACE_DATA.farm === modules.farm, "composed data should reuse farm module");
+      }
+
+      function assertFarmModel() {
+        const farm = window.AGENT_SPACE_DATA.farm;
+        assert(farm.schemaVersion === 1, "farm model should expose schemaVersion 1");
+        ["empty", "seeded", "growing", "ready", "withered"].forEach((state) => {
+          assert(farm.lifecycle.includes(state), `farm lifecycle should include ${state}`);
+          assert(Boolean(farm.states[state]), `farm states should define ${state}`);
+        });
+        ["plant", "water", "harvest", "steal", "help_water"].forEach((action) => {
+          assert(Boolean(farm.actions[action]), `farm actions should define ${action}`);
+        });
+        assert(farm.actions.plant.from.includes("empty"), "plant should start from empty plots");
+        assert(farm.actions.harvest.from.includes("ready"), "harvest should require ready plots");
+        assert(farm.actions.steal.actor === "neighbor", "steal should be a neighbor action");
+        assert(Boolean(farm.crops.tomato), "farm crops should include tomato");
+        const farmItem = window.AGENT_SPACE_DATA.itemCatalog.farm_plot_basic;
+        ["plant", "harvest", "steal"].forEach((action) => {
+          assert(farmItem.actions.includes(action), `farm plot item should expose ${action}`);
+          assert(Boolean(farm.actions[action]), `farm model should match item action ${action}`);
+        });
+        ["fieldLeft", "fieldRight"].forEach((objectId) => {
+          const zone = yard.placedObjects[objectId];
+          assert(Boolean(zone.farmPlotId), `${objectId} should map to a farmPlotId`);
+          assert(farm.lifecycle.includes(zone.defaultFarmStateId), `${objectId} should map to a valid default farm state`);
+        });
       }
 
       const cases = [
@@ -190,6 +220,7 @@
 
       try {
         assertDataModules();
+        assertFarmModel();
 
         cases.forEach((testCase) => {
           testCase.bodyHits.forEach(({ name, point }) => {
