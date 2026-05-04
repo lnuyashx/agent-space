@@ -69,7 +69,8 @@ Current data model:
 - Decoration drawer launched via Settings button
 - Slot replacement updates `placedObjects[].itemId`
 - Local shop loop: unowned compatible furniture appears in the same drawer, can be bought with demo coins, then equipped
-- Browser `localStorage` save: owned items, coins, and scene placed-object item ids persist across refresh
+- Browser `localStorage` save: owned items, coins, and scene placed-object item ids persist across refresh with `schemaVersion: 2`
+- Settings drawer save debug footer: shows save schema/status/key and can reset local save state
 - Farm plot state model: `empty -> seeded -> growing -> ready -> withered`, with owner actions and neighbor actions documented in `docs/farm-plot-state-model.zh-CN.md`
 - Room theme and bundle model: themes define style tokens and renderer requirements; bundles grant furniture and write `sceneSnapshot.themeId` plus placed object item ids
 
@@ -111,6 +112,7 @@ When continuing this demo, keep the same architecture:
 - Farm plot objects should use stable `farmPlotId` values; future saves should store farm snapshots by that id rather than by canvas position.
 - Theme bundle ownership should stay separate from item ownership; equipping a bundle writes a theme id plus compatible slot item ids.
 - Local demo persistence uses `localStorage`; production should replace it with Local Bridge / SQLite / Hub sync.
+- Current save key is `agent-space-demo-save`; old `agent-space-demo-save-v1` can be read and is removed after the next successful v2 save.
 - Hotspots must stay aligned with the visible art object they represent.
 - New objects should use `hitAreas` polygons/rects/ellipses that trace the actual art body.
 - Decoration changes should update `placedObjects[].itemId`, then the renderer should decide how to show the new item.

@@ -18,7 +18,7 @@
 - 会话驱动状态：真实工作/休息由底部会话框触发，agent 自动移动到对应区域
 - 装修 / 商城雏形：点击「设置」打开槽位式装修抽屉；已拥有物品可直接装备，未拥有物品可用本地金币购买后装备
 - 临时对象层：替换家具后，画面会在对应槽位绘制一个像素风家具占位物，证明 `placedObjects[].itemId` 已经驱动画面变化；正式版会换成真实 sprite atlas
-- 本地快照：购买记录、金币和已摆放家具会写入浏览器 `localStorage`，刷新后保留
+- 本地快照：购买记录、金币和已摆放家具会按 `schemaVersion` 写入浏览器 `localStorage`，刷新后保留；设置抽屉里可查看存档状态并重置本地存档
 - Agent 状态面板、能量、心情、经验
 - 输入聊天、移动、派任务
 - 工作可视化：接任务、走到工作位、工作中、完成标记、Artifact 抽屉
@@ -80,6 +80,7 @@
 
 当前 demo 用 `localStorage` 存这些数据，正式版再替换成 Local Bridge / SQLite / Hub 同步。
 当前浏览器加载顺序是数据切片先挂到 `window.AGENT_SPACE_DATA_MODULES`，再由 `data/game-data.js` 组合为旧入口，保证 `app.js` 和旧测试不需要理解每个切片文件。
+当前存档 payload 写入 `schemaVersion: 2` 和 `savedAt`，仍兼容读取旧的 `agent-space-demo-save-v1`。
 
 ## 明确延后
 
@@ -97,8 +98,9 @@ node --check app.js
 for file in data/*.js; do node --check "$file"; done
 scripts/check-hitareas.sh
 scripts/check-smoke.sh
+scripts/check-save-state.sh
 ```
 
 `scripts/check-hitareas.sh` 会用 headless Chrome / Chromium 打开 `tests/hitareas-browser.html`，验证室内物体主体命中和旧大角落误命中失效。
-
 `scripts/check-smoke.sh` 会用 headless Chrome / Chromium 打开真实 `index.html`，模拟启动、物件点击、门导航、装修抽屉、商城购买和刷新后的 `localStorage` 恢复。脚本默认不保存截图。
+`scripts/check-save-state.sh` 会打开 `tests/save-state-browser.html`，验证存档版本、写入、旧 key 清理和重置按钮。
