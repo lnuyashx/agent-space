@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#2d2119" flood-opacity=".22"/>
+    </filter>
+    <style>
+      .line { stroke: rgba(45, 31, 23, .38); stroke-width: 4; stroke-linejoin: round; }
+      .soft { fill: rgba(255, 255, 255, .34); }
+      .wood { fill: #6b4935; }
+      .dark { fill: #2d3545; }
+      .screen { fill: #b8def7; }
+      .paper { fill: #fff6df; }
+      .plant { fill: #75a66f; }
+    </style>
+  </defs>
+
+  <g id="bed.pink_basic" transform="translate(0 0)" filter="url(#shadow)">
+    <ellipse cx="80" cy="98" rx="52" ry="11" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="27" y="43" width="106" height="39" rx="9" fill="#f3a3b9"/>
+    <rect class="line" x="33" y="28" width="34" height="22" rx="7" fill="#fff1f5"/>
+    <path class="soft" d="M70 34h48c11 0 18 7 18 18v5H70z"/>
+    <rect class="wood" x="29" y="80" width="11" height="16" rx="2"/>
+    <rect class="wood" x="120" y="80" width="11" height="16" rx="2"/>
+  </g>
+
+  <g id="bed.blue_ocean" transform="translate(160 0)" filter="url(#shadow)">
+    <ellipse cx="80" cy="98" rx="52" ry="11" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="27" y="43" width="106" height="39" rx="9" fill="#6faed6"/>
+    <rect class="line" x="33" y="28" width="34" height="22" rx="7" fill="#eaf8ff"/>
+    <path class="soft" d="M70 34h48c11 0 18 7 18 18v5H70z"/>
+    <rect class="wood" x="29" y="80" width="11" height="16" rx="2"/>
+    <rect class="wood" x="120" y="80" width="11" height="16" rx="2"/>
+  </g>
+
+  <g id="bed.lavender_cloud" transform="translate(320 0)" filter="url(#shadow)">
+    <ellipse cx="80" cy="98" rx="52" ry="11" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="27" y="43" width="106" height="39" rx="9" fill="#b695d8"/>
+    <rect class="line" x="33" y="28" width="34" height="22" rx="7" fill="#fff0fb"/>
+    <path class="soft" d="M70 34h48c11 0 18 7 18 18v5H70z"/>
+    <rect class="wood" x="29" y="80" width="11" height="16" rx="2"/>
+    <rect class="wood" x="120" y="80" width="11" height="16" rx="2"/>
+  </g>
+
+  <g id="sofa.green_basic" transform="translate(480 0)" filter="url(#shadow)">
+    <ellipse cx="80" cy="99" rx="56" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="27" y="37" width="106" height="38" rx="12" fill="#75a66f"/>
+    <rect class="line" x="18" y="56" width="25" height="36" rx="9" fill="#75a66f"/>
+    <rect class="line" x="117" y="56" width="25" height="36" rx="9" fill="#75a66f"/>
+    <rect x="51" y="59" width="24" height="23" rx="5" fill="#f5edca"/>
+    <rect x="84" y="59" width="24" height="23" rx="5" fill="#f5edca"/>
+  </g>
+
+  <g id="sofa.cream_modern" transform="translate(640 0)" filter="url(#shadow)">
+    <ellipse cx="80" cy="99" rx="56" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="27" y="37" width="106" height="38" rx="12" fill="#ead7b3"/>
+    <rect class="line" x="18" y="56" width="25" height="36" rx="9" fill="#ead7b3"/>
+    <rect class="line" x="117" y="56" width="25" height="36" rx="9" fill="#ead7b3"/>
+    <rect x="51" y="59" width="24" height="23" rx="5" fill="#7fb4a5"/>
+    <rect x="84" y="59" width="24" height="23" rx="5" fill="#7fb4a5"/>
+  </g>
+
+  <g id="sofa.teal_studio" transform="translate(0 120)" filter="url(#shadow)">
+    <ellipse cx="80" cy="99" rx="56" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="27" y="37" width="106" height="38" rx="12" fill="#368c8f"/>
+    <rect class="line" x="18" y="56" width="25" height="36" rx="9" fill="#368c8f"/>
+    <rect class="line" x="117" y="56" width="25" height="36" rx="9" fill="#368c8f"/>
+    <rect x="51" y="59" width="24" height="23" rx="5" fill="#ffd7a8"/>
+    <rect x="84" y="59" width="24" height="23" rx="5" fill="#ffd7a8"/>
+  </g>
+
+  <g id="tv.cabinet_basic" transform="translate(160 120)" filter="url(#shadow)">
+    <ellipse cx="80" cy="99" rx="50" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line dark" x="39" y="26" width="82" height="48" rx="6"/>
+    <rect class="screen" x="48" y="34" width="64" height="31" rx="3"/>
+    <rect class="line" x="27" y="80" width="106" height="18" rx="4" fill="#5e493b"/>
+    <rect class="wood" x="73" y="72" width="14" height="10" rx="2"/>
+  </g>
+
+  <g id="bookshelf.wall_basic" transform="translate(320 120)" filter="url(#shadow)">
+    <ellipse cx="80" cy="103" rx="42" ry="9" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="39" y="17" width="82" height="84" rx="5" fill="#936944"/>
+    <rect class="paper" x="48" y="27" width="18" height="14"/><rect fill="#d8b772" x="70" y="27" width="16" height="14"/><rect class="plant" x="91" y="27" width="20" height="14"/>
+    <rect fill="#d8b772" x="48" y="49" width="25" height="14"/><rect class="paper" x="77" y="49" width="15" height="14"/><rect fill="#9eb9d4" x="96" y="49" width="15" height="14"/>
+    <rect class="paper" x="48" y="72" width="63" height="17"/>
+  </g>
+
+  <g id="bookshelf.dark_archive" transform="translate(480 120)" filter="url(#shadow)">
+    <ellipse cx="80" cy="103" rx="42" ry="9" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="39" y="17" width="82" height="84" rx="5" fill="#4f372c"/>
+    <rect fill="#b88e56" x="48" y="27" width="22" height="14"/><rect class="paper" x="74" y="27" width="15" height="14"/><rect fill="#7a6a58" x="93" y="27" width="18" height="14"/>
+    <rect class="paper" x="48" y="49" width="19" height="14"/><rect fill="#b88e56" x="71" y="49" width="40" height="14"/>
+    <rect fill="#2d2119" opacity=".2" x="48" y="72" width="63" height="17"/>
+  </g>
+
+  <g id="bookshelf.white_gallery" transform="translate(640 120)" filter="url(#shadow)">
+    <ellipse cx="80" cy="103" rx="42" ry="9" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="39" y="17" width="82" height="84" rx="5" fill="#e7dfd2"/>
+    <rect fill="#7b9ec8" x="48" y="27" width="22" height="14"/><rect class="paper" x="74" y="27" width="15" height="14"/><rect fill="#d8b772" x="93" y="27" width="18" height="14"/>
+    <rect class="paper" x="48" y="49" width="19" height="14"/><rect fill="#7b9ec8" x="71" y="49" width="40" height="14"/>
+    <rect fill="#fffaf2" x="48" y="72" width="63" height="17"/>
+  </g>
+
+  <g id="desk.computer_basic" transform="translate(0 240)" filter="url(#shadow)">
+    <ellipse cx="80" cy="101" rx="54" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="27" y="65" width="106" height="22" rx="5" fill="#7b5940"/>
+    <rect class="wood" x="35" y="84" width="11" height="19" rx="2"/><rect class="wood" x="115" y="84" width="11" height="19" rx="2"/>
+    <rect class="line dark" x="57" y="30" width="48" height="32" rx="4"/>
+    <rect class="screen" x="64" y="37" width="34" height="18"/>
+  </g>
+
+  <g id="desk.dual_monitor" transform="translate(160 240)" filter="url(#shadow)">
+    <ellipse cx="80" cy="101" rx="54" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="27" y="65" width="106" height="22" rx="5" fill="#4b5f7d"/>
+    <rect class="wood" x="35" y="84" width="11" height="19" rx="2"/><rect class="wood" x="115" y="84" width="11" height="19" rx="2"/>
+    <rect class="line dark" x="37" y="30" width="42" height="30" rx="4"/><rect class="line dark" x="84" y="30" width="42" height="30" rx="4"/>
+    <rect class="screen" x="44" y="37" width="28" height="16"/><rect class="screen" x="91" y="37" width="28" height="16"/>
+  </g>
+
+  <g id="desk.creator_pink" transform="translate(320 240)" filter="url(#shadow)">
+    <ellipse cx="80" cy="101" rx="54" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="27" y="65" width="106" height="22" rx="5" fill="#c77a98"/>
+    <rect class="wood" x="35" y="84" width="11" height="19" rx="2"/><rect class="wood" x="115" y="84" width="11" height="19" rx="2"/>
+    <rect class="line dark" x="37" y="30" width="42" height="30" rx="4"/><rect class="line dark" x="84" y="30" width="42" height="30" rx="4"/>
+    <rect fill="#ffe1ec" x="44" y="37" width="28" height="16"/><rect fill="#ffe1ec" x="91" y="37" width="28" height="16"/>
+  </g>
+
+  <g id="fixture.garden_door" transform="translate(480 240)" filter="url(#shadow)">
+    <ellipse cx="80" cy="103" rx="42" ry="9" fill="#2d2119" opacity=".16"/>
+    <path class="line" d="M49 20h60v82H49z" fill="#8b5a35"/>
+    <rect fill="#7bd0ff" x="61" y="31" width="36" height="36" rx="4"/>
+    <circle fill="#f5d08a" cx="99" cy="71" r="4"/>
+  </g>
+
+  <g id="kitchen.basic" transform="translate(640 240)" filter="url(#shadow)">
+    <ellipse cx="80" cy="101" rx="56" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="25" y="45" width="110" height="43" rx="6" fill="#d99162"/>
+    <rect fill="#fff1c4" x="25" y="35" width="110" height="13" rx="4"/>
+    <rect class="paper" x="36" y="56" width="25" height="22" rx="4"/><rect fill="#5e7894" x="70" y="59" width="25" height="12" rx="3"/><rect class="paper" x="105" y="55" width="18" height="24" rx="4"/>
+  </g>
+
+  <g id="kitchen.mint" transform="translate(0 360)" filter="url(#shadow)">
+    <ellipse cx="80" cy="101" rx="56" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="25" y="45" width="110" height="43" rx="6" fill="#7ec7ad"/>
+    <rect fill="#fff5cf" x="25" y="35" width="110" height="13" rx="4"/>
+    <rect class="paper" x="36" y="56" width="25" height="22" rx="4"/><rect fill="#5e7894" x="70" y="59" width="25" height="12" rx="3"/><rect class="paper" x="105" y="55" width="18" height="24" rx="4"/>
+  </g>
+
+  <g id="kitchen.sunrise" transform="translate(160 360)" filter="url(#shadow)">
+    <ellipse cx="80" cy="101" rx="56" ry="10" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="25" y="45" width="110" height="43" rx="6" fill="#e48b55"/>
+    <rect fill="#ffe2a8" x="25" y="35" width="110" height="13" rx="4"/>
+    <rect class="paper" x="36" y="56" width="25" height="22" rx="4"/><rect fill="#5e7894" x="70" y="59" width="25" height="12" rx="3"/><rect class="paper" x="105" y="55" width="18" height="24" rx="4"/>
+  </g>
+
+  <g id="fixture.porch_basic" transform="translate(320 360)" filter="url(#shadow)">
+    <ellipse cx="80" cy="103" rx="46" ry="9" fill="#2d2119" opacity=".16"/>
+    <path class="line" d="M38 85 80 26l42 59z" fill="#f5d08a"/>
+    <rect class="line" x="58" y="54" width="44" height="42" rx="4" fill="#8b5a35"/>
+  </g>
+
+  <g id="farm.plot_basic" transform="translate(480 360)" filter="url(#shadow)">
+    <ellipse cx="80" cy="101" rx="58" ry="11" fill="#2d2119" opacity=".16"/>
+    <path class="line" d="M24 57h112l-18 36H42z" fill="#8d633c"/>
+    <path fill="#7ebc66" d="M43 59c8-16 18-16 28 0 8-15 21-16 31 0 8-13 20-13 29 0z"/>
+    <path stroke="#6d482b" stroke-width="3" d="M42 71h75M36 83h86"/>
+  </g>
+
+  <g id="fixture.mailbox_basic" transform="translate(640 360)" filter="url(#shadow)">
+    <ellipse cx="80" cy="102" rx="34" ry="8" fill="#2d2119" opacity=".16"/>
+    <rect class="line" x="51" y="49" width="58" height="34" rx="6" fill="#d85c58"/>
+    <path class="line" d="M51 58c5-19 53-19 58 0z" fill="#fff7d6"/>
+    <rect class="wood" x="75" y="82" width="10" height="22" rx="2"/>
+    <path fill="#fff7d6" d="M102 43h18v7h-18z"/>
+  </g>
+</svg>

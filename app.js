@@ -26,6 +26,18 @@ Object.values(sceneImages).forEach((image) => {
   image.onload = () => requestAnimationFrame(draw);
 });
 
+const atlasDefinitions = Object.values(gameData.assets.atlases || {});
+const atlasImages = Object.fromEntries(
+  atlasDefinitions
+    .filter((atlas) => atlas.image)
+    .map((atlas) => {
+      const image = new Image();
+      image.src = atlas.image;
+      image.onload = () => requestAnimationFrame(draw);
+      return [atlas.key, image];
+    }),
+);
+
 const agentImage = new Image();
 agentImage.src = gameData.assets.agent;
 agentImage.onload = () => {
@@ -418,6 +430,15 @@ function itemSprite(item) {
   };
 }
 
+function atlasForSprite(sprite) {
+  return atlasDefinitions.find((atlas) => atlas.key === sprite.atlasKey) || null;
+}
+
+function frameForSprite(sprite) {
+  const atlas = atlasForSprite(sprite);
+  return atlas?.frames?.[sprite.spriteId] || null;
+}
+
 function swatchMarkup(item) {
   const visual = itemSprite(item).fallback;
   return `<span class="decor-swatch" style="--swatch:${visual.color}; --swatch-accent:${visual.accent};"></span>`;
@@ -594,6 +615,8 @@ function drawPixelFurniture(zone, item, options) {
   const sprite = itemSprite(item);
   const visual = sprite.fallback;
   const spriteKind = visual.kind || item?.category;
+  const atlasImage = atlasImages[sprite.atlasKey];
+  const atlasFrame = frameForSprite(sprite);
   const bounds = zoneBounds(zone);
   const p1 = sceneToCanvas({ x: bounds.x, y: bounds.y });
   const p2 = sceneToCanvas({ x: bounds.x + bounds.w, y: bounds.y + bounds.h });
@@ -613,7 +636,9 @@ function drawPixelFurniture(zone, item, options) {
   ctx.ellipse(0, 34, 44, 9, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  if (spriteKind === "bed") drawBedSprite(visual);
+  if (atlasImage?.complete && atlasImage.naturalWidth && atlasFrame) {
+    ctx.drawImage(atlasImage, atlasFrame.x, atlasFrame.y, atlasFrame.w, atlasFrame.h, -58, -54, 116, 96);
+  } else if (spriteKind === "bed") drawBedSprite(visual);
   else if (spriteKind === "sofa") drawSofaSprite(visual);
   else if (spriteKind === "bookshelf") drawBookshelfSprite(visual);
   else if (spriteKind === "desk") drawDeskSprite(visual, visual.variant === "dual-monitor");

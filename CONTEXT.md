@@ -38,6 +38,7 @@ Current visual assets:
 - `assets/scene-indoor-v2.png`
 - `assets/scene-yard.png`
 - `assets/aria-agent-v2.png`
+- `assets/furniture-prototype-atlas.svg`
 
 Current data model:
 
@@ -85,8 +86,9 @@ Because the current room is still a static background image, replacing a furnitu
 Temporary object visual layer:
 
 - item catalog has `sprite` metadata with `atlasKey`, `spriteId`, `anchor`, and canvas fallback data
+- `assets.atlases.furniturePrototype` maps sprite ids to frames in `assets/furniture-prototype-atlas.svg`
 - item catalog also has local-demo `price` metadata for shop validation
-- canvas draws a small pixel furniture placeholder from `sprite.fallback` over decoratable slots during decoration mode
+- canvas draws atlas frames first, then falls back to `sprite.fallback` over decoratable slots during decoration mode
 - replaced furniture remains visible after leaving decoration mode
 
 Later replace this temporary overlay with real PixiJS textures resolved by `sprite.atlasKey` and `sprite.spriteId`.

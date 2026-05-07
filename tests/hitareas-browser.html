@@ -295,6 +295,10 @@
           assert(Boolean(item.sprite?.spriteId), `${itemId} is missing sprite.spriteId`);
           assert(Boolean(item.sprite?.anchor), `${itemId} is missing sprite.anchor`);
           assert(Boolean(item.sprite?.fallback?.kind), `${itemId} is missing sprite fallback kind`);
+          const atlas = Object.values(window.AGENT_SPACE_DATA.assets.atlases || {}).find((entry) => entry.key === item.sprite.atlasKey);
+          assert(Boolean(atlas), `${itemId} points to missing atlas ${item.sprite.atlasKey}`);
+          assert(Boolean(atlas.image), `${itemId} atlas ${item.sprite.atlasKey} is missing an image path`);
+          assert(Boolean(atlas.frames?.[item.sprite.spriteId]), `${itemId} points to missing atlas frame ${item.sprite.spriteId}`);
         });
 
         const passed = assertions.filter((item) => item.pass).length;
