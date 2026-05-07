@@ -1,6 +1,21 @@
 // Furniture, fixture, farm, and mailbox item catalog. This file is loaded by index.html before data/game-data.js.
 window.AGENT_SPACE_DATA_MODULES = window.AGENT_SPACE_DATA_MODULES || {};
 
+function prototypeSprite(spriteId, kind, color, accent, short, options = {}) {
+  return {
+    atlasKey: "prototype-furniture",
+    spriteId,
+    anchor: { x: 0.5, y: 1 },
+    fallback: {
+      kind,
+      ...options,
+      color,
+      accent,
+      short,
+    },
+  };
+}
+
 window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
   "bed_pink_basic": {
     "type": "furniture",
@@ -15,11 +30,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_rest",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#f3a3b9",
-      "accent": "#fff1f5",
-      "short": "BED"
-    }
+    "sprite": prototypeSprite("bed.pink_basic", "bed", "#f3a3b9", "#fff1f5", "BED")
   },
   "bed_blue_ocean": {
     "type": "furniture",
@@ -34,11 +45,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_rest",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#6faed6",
-      "accent": "#eaf8ff",
-      "short": "BED"
-    }
+    "sprite": prototypeSprite("bed.blue_ocean", "bed", "#6faed6", "#eaf8ff", "BED")
   },
   "bed_lavender_cloud": {
     "type": "furniture",
@@ -53,11 +60,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_rest",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#b695d8",
-      "accent": "#fff0fb",
-      "short": "BED"
-    }
+    "sprite": prototypeSprite("bed.lavender_cloud", "bed", "#b695d8", "#fff0fb", "BED")
   },
   "sofa_green_basic": {
     "type": "furniture",
@@ -72,11 +75,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_idle",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#75a66f",
-      "accent": "#f5edca",
-      "short": "SOFA"
-    }
+    "sprite": prototypeSprite("sofa.green_basic", "sofa", "#75a66f", "#f5edca", "SOFA")
   },
   "sofa_cream_modern": {
     "type": "furniture",
@@ -91,11 +90,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_idle",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#ead7b3",
-      "accent": "#7fb4a5",
-      "short": "SOFA"
-    }
+    "sprite": prototypeSprite("sofa.cream_modern", "sofa", "#ead7b3", "#7fb4a5", "SOFA")
   },
   "sofa_teal_studio": {
     "type": "furniture",
@@ -110,11 +105,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_idle",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#368c8f",
-      "accent": "#ffd7a8",
-      "short": "SOFA"
-    }
+    "sprite": prototypeSprite("sofa.teal_studio", "sofa", "#368c8f", "#ffd7a8", "SOFA")
   },
   "tv_cabinet_basic": {
     "type": "furniture",
@@ -129,11 +120,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_idle",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#5e493b",
-      "accent": "#c9dce3",
-      "short": "TV"
-    }
+    "sprite": prototypeSprite("tv.cabinet_basic", "tv", "#5e493b", "#c9dce3", "TV")
   },
   "bookshelf_wall_basic": {
     "type": "furniture",
@@ -148,11 +135,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_research",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#936944",
-      "accent": "#d8b772",
-      "short": "BOOK"
-    }
+    "sprite": prototypeSprite("bookshelf.wall_basic", "bookshelf", "#936944", "#d8b772", "BOOK")
   },
   "bookshelf_dark_archive": {
     "type": "furniture",
@@ -167,11 +150,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_research",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#4f372c",
-      "accent": "#b88e56",
-      "short": "BOOK"
-    }
+    "sprite": prototypeSprite("bookshelf.dark_archive", "bookshelf", "#4f372c", "#b88e56", "BOOK")
   },
   "bookshelf_white_gallery": {
     "type": "furniture",
@@ -186,11 +165,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_research",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#e7dfd2",
-      "accent": "#7b9ec8",
-      "short": "BOOK"
-    }
+    "sprite": prototypeSprite("bookshelf.white_gallery", "bookshelf", "#e7dfd2", "#7b9ec8", "BOOK")
   },
   "computer_desk_basic": {
     "type": "furniture",
@@ -205,11 +180,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_work",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#7b5940",
-      "accent": "#86a8c8",
-      "short": "DESK"
-    }
+    "sprite": prototypeSprite("desk.computer_basic", "desk", "#7b5940", "#86a8c8", "DESK")
   },
   "computer_desk_dual_monitor": {
     "type": "furniture",
@@ -224,11 +195,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_work",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#4b5f7d",
-      "accent": "#b8def7",
-      "short": "DUAL"
-    }
+    "sprite": prototypeSprite("desk.dual_monitor", "desk", "#4b5f7d", "#b8def7", "DUAL", { variant: "dual-monitor" })
   },
   "computer_desk_creator_pink": {
     "type": "furniture",
@@ -243,11 +210,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_work",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#c77a98",
-      "accent": "#ffe1ec",
-      "short": "DUAL"
-    }
+    "sprite": prototypeSprite("desk.creator_pink", "desk", "#c77a98", "#ffe1ec", "DUAL", { variant: "dual-monitor" })
   },
   "door_garden_basic": {
     "type": "fixture",
@@ -261,11 +224,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
     "actions": [
       "navigate_yard"
     ],
-    "visual": {
-      "color": "#8b5a35",
-      "accent": "#7bd0ff",
-      "short": "EXIT"
-    }
+    "sprite": prototypeSprite("fixture.garden_door", "door", "#8b5a35", "#7bd0ff", "EXIT")
   },
   "kitchen_set_basic": {
     "type": "furniture",
@@ -280,11 +239,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_cook",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#d99162",
-      "accent": "#fff1c4",
-      "short": "KIT"
-    }
+    "sprite": prototypeSprite("kitchen.basic", "kitchen", "#d99162", "#fff1c4", "KIT")
   },
   "kitchen_set_mint": {
     "type": "furniture",
@@ -299,11 +254,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_cook",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#7ec7ad",
-      "accent": "#fff5cf",
-      "short": "KIT"
-    }
+    "sprite": prototypeSprite("kitchen.mint", "kitchen", "#7ec7ad", "#fff5cf", "KIT")
   },
   "kitchen_set_sunrise": {
     "type": "furniture",
@@ -318,11 +269,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "preview_cook",
       "decorate_replace"
     ],
-    "visual": {
-      "color": "#e48b55",
-      "accent": "#ffe2a8",
-      "short": "KIT"
-    }
+    "sprite": prototypeSprite("kitchen.sunrise", "kitchen", "#e48b55", "#ffe2a8", "KIT")
   },
   "porch_basic": {
     "type": "fixture",
@@ -336,11 +283,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
     "actions": [
       "navigate_indoor"
     ],
-    "visual": {
-      "color": "#8b5a35",
-      "accent": "#f5d08a",
-      "short": "HOME"
-    }
+    "sprite": prototypeSprite("fixture.porch_basic", "door", "#8b5a35", "#f5d08a", "HOME")
   },
   "farm_plot_basic": {
     "type": "farm",
@@ -356,11 +299,7 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
       "harvest",
       "steal"
     ],
-    "visual": {
-      "color": "#8d633c",
-      "accent": "#7ebc66",
-      "short": "FARM"
-    }
+    "sprite": prototypeSprite("farm.plot_basic", "farm", "#8d633c", "#7ebc66", "FARM")
   },
   "mailbox_basic": {
     "type": "fixture",
@@ -374,10 +313,6 @@ window.AGENT_SPACE_DATA_MODULES.itemCatalog = {
     "actions": [
       "open_feed"
     ],
-    "visual": {
-      "color": "#d85c58",
-      "accent": "#fff7d6",
-      "short": "MAIL"
-    }
+    "sprite": prototypeSprite("fixture.mailbox_basic", "mailbox", "#d85c58", "#fff7d6", "MAIL")
   }
 };

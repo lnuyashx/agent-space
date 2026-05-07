@@ -290,6 +290,13 @@
           });
         });
 
+        Object.entries(window.AGENT_SPACE_DATA.itemCatalog).forEach(([itemId, item]) => {
+          assert(Boolean(item.sprite?.atlasKey), `${itemId} is missing sprite.atlasKey`);
+          assert(Boolean(item.sprite?.spriteId), `${itemId} is missing sprite.spriteId`);
+          assert(Boolean(item.sprite?.anchor), `${itemId} is missing sprite.anchor`);
+          assert(Boolean(item.sprite?.fallback?.kind), `${itemId} is missing sprite fallback kind`);
+        });
+
         const passed = assertions.filter((item) => item.pass).length;
         report.textContent = `HITAREA_TEST_PASS\n${passed} browser assertions passed.`;
         document.title = "PASS Agent Space Hit Areas";

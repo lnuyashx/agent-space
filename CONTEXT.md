@@ -84,12 +84,12 @@ Because the current room is still a static background image, replacing a furnitu
 
 Temporary object visual layer:
 
-- item catalog has lightweight `visual` metadata
+- item catalog has `sprite` metadata with `atlasKey`, `spriteId`, `anchor`, and canvas fallback data
 - item catalog also has local-demo `price` metadata for shop validation
-- canvas draws a small pixel furniture placeholder over decoratable slots during decoration mode
+- canvas draws a small pixel furniture placeholder from `sprite.fallback` over decoratable slots during decoration mode
 - replaced furniture remains visible after leaving decoration mode
 
-Later replace this temporary overlay with real PixiJS sprites from a sprite atlas.
+Later replace this temporary overlay with real PixiJS textures resolved by `sprite.atlasKey` and `sprite.spriteId`.
 
 Indoor object-body hit area calibration:
 

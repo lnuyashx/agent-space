@@ -22,7 +22,7 @@ The current browser data entrypoint is still `window.AGENT_SPACE_DATA`, but it i
 - `data/assets.js`: scene backgrounds and character sprite paths
 - `data/item-catalog.js`: sellable or system items, such as beds, desks, doors, farm plots, mailbox
 - `itemCatalog[].price`: local-demo coin price for shop validation
-- `itemCatalog[].visual`: temporary drawing metadata for the static-background prototype
+- `itemCatalog[].sprite`: sprite atlas identity plus fallback drawing metadata for the static-background prototype
 - `data/inventory.js`: what the current user owns
 - `data/scenes.js`: the user's home and yard scene data
 - `placedObjects`: furniture / fixtures / farm objects placed in each scene
@@ -91,13 +91,21 @@ For PixiJS production:
 The current demo now draws a temporary object layer between the room background and the agent:
 
 - Decoration changes update `placedObjects[].itemId`.
-- The renderer reads `itemCatalog[itemId].visual`.
+- The renderer reads `itemCatalog[itemId].sprite`.
 - Default furniture stays mostly represented by the static background.
 - Replaced furniture remains visible as a small pixel-style object marker after leaving decoration mode.
 
-This is intentionally not the final art path. It proves the correct data flow before the project has a furniture sprite atlas. The production equivalent should use:
+This is intentionally not the final art path. It proves the correct data flow before the project has a furniture sprite atlas. The current sprite metadata shape is:
 
-- `spriteId` / `atlasKey` on the item catalog
+- `atlasKey`: atlas manifest key, currently `prototype-furniture`
+- `spriteId`: stable item-frame identity, for example `desk.dual_monitor`
+- `anchor`: normalized sprite anchor, ready for PixiJS placement
+- `fallback`: color/kind metadata for the canvas placeholder while real art is missing
+
+The production equivalent should use:
+
+- real `atlasKey` entries under `assets.atlases`
+- `spriteId` frames resolved from a PixiJS texture atlas
 - `position`, `depth`, `footprint`, and `collision` on each placed object
 - PixiJS sprites with depth sorting instead of canvas placeholder drawing
 
@@ -125,7 +133,7 @@ Recommended staging:
 
 The current demo models the minimum commerce chain without real payment:
 
-- `itemCatalog` owns price, rarity, category, slot compatibility, and visual metadata.
+- `itemCatalog` owns price, rarity, category, slot compatibility, and sprite metadata.
 - `inventory.owned` decides whether a user can equip an item.
 - If an item is not owned, the drawer checks the active agent's local coins.
 - A successful purchase subtracts coins, writes `inventory.owned[itemId] = 1`, then equips the item into the selected `placedObject`.
