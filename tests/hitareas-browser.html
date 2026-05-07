@@ -301,6 +301,15 @@
           assert(Boolean(atlas.frames?.[item.sprite.spriteId]), `${itemId} points to missing atlas frame ${item.sprite.spriteId}`);
         });
 
+        const sceneAssets = window.AGENT_SPACE_DATA.assets.scenes || {};
+        assert(Boolean(sceneAssets[indoor.assetId]), `indoor scene points to missing asset ${indoor.assetId}`);
+        assert(Boolean(indoor.decoratingAssetId), "indoor scene is missing decoratingAssetId");
+        assert(Boolean(sceneAssets[indoor.decoratingAssetId]), `indoor decoratingAssetId points to missing asset ${indoor.decoratingAssetId}`);
+        assert(
+          indoor.decoratingAssetId !== indoor.assetId,
+          "indoor decoratingAssetId should use a separate empty-room background",
+        );
+
         const passed = assertions.filter((item) => item.pass).length;
         report.textContent = `HITAREA_TEST_PASS\n${passed} browser assertions passed.`;
         document.title = "PASS Agent Space Hit Areas";

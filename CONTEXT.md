@@ -36,6 +36,7 @@ Main files:
 Current visual assets:
 
 - `assets/scene-indoor-v2.png`
+- `assets/scene-indoor-empty-prototype.svg`
 - `assets/scene-yard.png`
 - `assets/aria-agent-v2.png`
 - `assets/furniture-prototype-atlas.svg`
@@ -79,7 +80,7 @@ Current data model:
 
 ## Current Limitation
 
-Because the current room is still a static background image, replacing a furniture `itemId` cannot yet remove/redraw the original background furniture art. The demo now draws a temporary pixel-style object layer over replaced furniture as visible feedback.
+Because the normal room is still a static background image, replacing a furniture `itemId` cannot yet remove/redraw the original background furniture art in regular mode. Decoration mode now swaps to an empty-room prototype background and draws independent furniture sprites on top, so the object layer can be inspected without old baked-in furniture underneath.
 
 ## Latest Continuation
 
@@ -87,6 +88,7 @@ Temporary object visual layer:
 
 - item catalog has `sprite` metadata with `atlasKey`, `spriteId`, `anchor`, and canvas fallback data
 - `assets.atlases.furniturePrototype` maps sprite ids to frames in `assets/furniture-prototype-atlas.svg`
+- indoor `decoratingAssetId` points to `assets/scene-indoor-empty-prototype.svg` for decoration mode only
 - item catalog also has local-demo `price` metadata for shop validation
 - canvas draws atlas frames first, then falls back to `sprite.fallback` over decoratable slots during decoration mode
 - replaced furniture remains visible after leaving decoration mode

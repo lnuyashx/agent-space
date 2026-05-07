@@ -5,6 +5,7 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
   "indoor": {
     "label": "室内",
     "assetId": "indoor",
+    "decoratingAssetId": "indoorEmptyPrototype",
     "entry": {
       "x": 0.43,
       "y": 0.55

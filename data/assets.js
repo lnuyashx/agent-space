@@ -28,6 +28,7 @@ window.AGENT_SPACE_DATA_MODULES.assets = {
   "agent": "./assets/aria-agent-v2.png",
   "scenes": {
     "indoor": "./assets/scene-indoor-v2.png",
+    "indoorEmptyPrototype": "./assets/scene-indoor-empty-prototype.svg",
     "yard": "./assets/scene-yard.png"
   },
   "atlases": {
