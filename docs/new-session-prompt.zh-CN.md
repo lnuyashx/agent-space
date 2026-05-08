@@ -6,7 +6,7 @@
 
 ```text
 继续推进这个项目：
-https://github.com/lnuyashx/agent-space-demo
+https://github.com/lnuyashx/agent-space
 
 请先阅读：
 - CONTEXT.md
@@ -30,7 +30,7 @@ Codex commit 身份使用当前 session id：
 
 ```text
 继续推进这个项目：
-https://github.com/lnuyashx/agent-space-demo
+https://github.com/lnuyashx/agent-space
 
 请处理 issue #<编号>。
 开始前先阅读 CONTEXT.md、ROADMAP.md、CONTRIBUTING.md、docs/collaboration.zh-CN.md。
@@ -44,7 +44,7 @@ https://github.com/lnuyashx/agent-space-demo
 
 ```text
 继续推进这个项目：
-https://github.com/lnuyashx/agent-space-demo
+https://github.com/lnuyashx/agent-space
 
 请先阅读 CONTEXT.md 和当前工作分支状态。
 不要改代码。

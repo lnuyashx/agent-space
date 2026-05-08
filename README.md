@@ -1,8 +1,29 @@
-# Agent Space Demo
+# Agent Space
 
-这是一个静态 MVP-alpha 体验 demo，可直接用浏览器打开 `index.html`。
+语言：中文 | [English](README.en.md)
 
-新 Codex session / agent 先看 `AGENTS.md` 和 `STATUS.md`。当前任务状态以 GitHub Issues 和 `scripts/status.sh` 为准。
+Agent Space 的目标不是停在 Web 小屋原型，而是做成一个让本地 AI agent 拥有可视化生活空间、可装修家园、农场循环和真人机社交的平台。
+
+当前仓库会逐步升级为 Agent Space 主项目仓库。现在的 Web 体验是最终 Web 客户端的早期版本，不再作为一次性 demo 处理。
+
+新 session / agent 先看 `AGENTS.md` 和 `STATUS.md`。当前任务状态以 GitHub Issues 和 `scripts/status.sh` 为准。
+
+## 当前运行方式
+
+当前已经切到 Vite + TypeScript + PixiJS 项目基座。需要安装依赖后运行：
+
+```sh
+npm install
+npm run dev
+```
+
+默认打开的是保留完整玩法的 legacy canvas renderer。PixiJS renderer foundation 已接入，可用查询参数预览：
+
+```text
+http://127.0.0.1:5173/?renderer=pixi
+```
+
+这个 PixiJS 入口当前是正式渲染层的第一阶段基座，后续会把背景、家具对象层、角色、命中区、深度排序和装修逻辑逐步迁入 PixiJS。
 
 ## 当前包含
 
@@ -25,6 +46,7 @@
 - 院子交互：农田、信箱等是院子页面交互，不触发 agent 工作任务
 - 农田状态模型：`data/farm-model.js` 定义空地、播种、生长、可收获、枯萎生命周期，以及主人/邻居动作边界
 - 房间主题 / 家具包模型：`data/theme-bundles.js` 定义主题字段、bundle 授权、装备写入和渲染依赖
+- PixiJS renderer foundation：`src/pixi/pixi-foundation.ts` 已能加载场景、agent 和物件 marker，当前通过 `?renderer=pixi` 预览
 - `assets/scene-indoor-v2.png` 是当前室内整屋背景
 - `assets/scene-indoor-empty-prototype.svg` 是装修模式专用的空房间 prototype 背景，用来避免旧家具烘焙在底图里继续露出
 - `assets/scene-yard.png` 是当前院子背景
@@ -40,13 +62,22 @@
 - `docs/collaboration-overview.zh-CN.md` 记录 GitHub Issues / 分支 / 锁 / PR 的多 agent 协作方案
 - `AGENTS.md` 和 `STATUS.md` 是新 session 的入口文件
 
-## 需要你确认后可替换的输入
+## 项目定位
 
-- Agent 名字：当前为 Aria
-- 初始主题：当前为温暖橙
-- 角色视觉方向：当前为原创成年 anime agent，女仆风夏日装扮
-- 品牌名：当前为 Agent Space
-- 任务产物类型：当前内置代码、设计、做菜、思考四种模拟结果
+这个仓库的方向是最终版 Agent Space，而不是只负责 Web 小屋原型。
+
+当前阶段先把 Web 客户端从静态 canvas 原型升级为 Vite + TypeScript + PixiJS。之后再逐步推进：
+
+- game model 抽包
+- ASP 协议
+- Local Bridge
+- Web 连接 Local Bridge
+- Cloud Hub
+- 农场、邻居、动态流
+- 装修资产和商城
+- 桌宠
+
+详细阶段见 [ROADMAP.md](ROADMAP.md) 和 [docs/product-evolution.zh-CN.md](docs/product-evolution.zh-CN.md)。
 
 ## 交互架构
 
@@ -67,15 +98,15 @@
 - `slot`：槽位，比如 `study.desk`，V1 装修先从槽位替换开始
 - `label`：显示名，比如“大门”
 - `type`：`preview` / `navigate` / `yard`
-- `hitAreas`：贴合背景图里实际物件的命中区，可由多个 `polygon` / `rect` / `ellipse` 组合而成
-- `point`：agent 交互时站到哪里
+- `hitAreas`：贴合实际美术物体的命中区
+- `point`：agent 交互时站位
 - `bubble`：点击或悬浮后的反馈文案
-- `to`：只有导航热区需要，比如大门 `to: "yard"`
+- `to`：导航目标场景
 
-长期正式产品会把这些数据拆到后端/本地 Bridge：
+长期正式产品会把这些数据拆到本地 Bridge / Hub / CDN：
 
 - `items`：平台物品目录
-- `inventory`：用户拥有的家具/皮肤/道具
+- `inventory`：用户拥有的家具、皮肤、道具
 - `sceneSnapshot`：用户当前房间装修快照
 - `placedObjects`：每个家具实例的摆放位置、槽位、碰撞和交互
 - `farm`：农田生命周期、作物目录、主人动作、邻居动作和地块快照形状；详见 `docs/farm-plot-state-model.zh-CN.md`
@@ -85,10 +116,10 @@
 当前浏览器加载顺序是数据切片先挂到 `window.AGENT_SPACE_DATA_MODULES`，再由 `data/game-data.js` 组合为旧入口，保证 `app.js` 和旧测试不需要理解每个切片文件。
 当前存档 payload 写入 `schemaVersion: 2` 和 `savedAt`，仍兼容读取旧的 `agent-space-demo-save-v1`。
 
-## 明确延后
+## 暂缓范围
 
 - Local Bridge 真实 WebSocket 服务
-- Claude Agent SDK 真实适配器
+- Claude Code / OpenClaw 真实适配器
 - SQLite 本地持久化
 - Hub 联机广播
 - 真实商城和支付
@@ -97,13 +128,10 @@
 ## 本地验证
 
 ```sh
-node --check app.js
-for file in data/*.js; do node --check "$file"; done
-scripts/check-hitareas.sh
-scripts/check-smoke.sh
-scripts/check-save-state.sh
+npm install
+npm run check
 ```
 
-`scripts/check-hitareas.sh` 会用 headless Chrome / Chromium 打开 `tests/hitareas-browser.html`，验证室内物体主体命中和旧大角落误命中失效。
+`npm run check` 会执行 TypeScript / Vite build、legacy canvas 语法、所有 `data/*.js` 语法和 `scripts/check-hitareas.sh`。
 `scripts/check-smoke.sh` 会用 headless Chrome / Chromium 打开真实 `index.html`，模拟启动、物件点击、门导航、装修抽屉、商城购买和刷新后的 `localStorage` 恢复。脚本默认不保存截图。
 `scripts/check-save-state.sh` 会打开 `tests/save-state-browser.html`，验证存档版本、写入、旧 key 清理和重置按钮。

@@ -3,12 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Agent Space Demo</title>
+    <title>Agent Space</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <main class="room-stage" aria-label="Agent room">
+        <div id="pixiStage" class="pixi-stage" aria-label="Agent Space PixiJS stage"></div>
         <canvas id="worldCanvas" width="1280" height="720" aria-label="Agent Space full room"></canvas>
 
         <section class="room-hud hud-left">
@@ -104,14 +105,6 @@
       </div>
     </aside>
 
-    <script src="./data/assets.js"></script>
-    <script src="./data/item-catalog.js"></script>
-    <script src="./data/inventory.js"></script>
-    <script src="./data/scenes.js"></script>
-    <script src="./data/agents.js"></script>
-    <script src="./data/farm-model.js"></script>
-    <script src="./data/theme-bundles.js"></script>
-    <script src="./data/game-data.js"></script>
-    <script src="./app.js"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

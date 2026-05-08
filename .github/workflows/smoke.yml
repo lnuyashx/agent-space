@@ -18,14 +18,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Check app syntax
-        run: node --check app.js
+      - name: Install dependencies
+        run: npm install
 
-      - name: Check data syntax
-        run: |
-          for file in data/*.js; do
-            node --check "$file"
-          done
-
-      - name: Run browser smoke checks
-        run: scripts/check-smoke.sh
+      - name: Check project
+        run: npm run check

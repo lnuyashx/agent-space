@@ -1,6 +1,6 @@
-# Agent Space Demo Architecture
+# Agent Space Architecture
 
-This demo is now a transitional version between a static mockup and the future PixiJS game client.
+Agent Space is now a transitional version between a static mockup and the future PixiJS game client.
 
 ## Direction
 
@@ -88,7 +88,7 @@ For PixiJS production:
 
 ## Temporary Object Layer
 
-The current demo now draws a temporary object layer between the room background and the agent:
+The current client now draws a temporary object layer between the room background and the agent:
 
 - Decoration changes update `placedObjects[].itemId`.
 - The renderer reads `itemCatalog[itemId].sprite`.
@@ -119,8 +119,8 @@ Recommended staging:
 1. Slot replacement
    - fixed slots such as `study.desk`, `bedroom.bed`, `living.sofa`
    - safe for V1 monetization and visual consistency
-   - current demo implements this as a decoration drawer that updates `placedObjects[].itemId`
-   - current demo also lets unowned slot-compatible items be bought with local coins, then added to `inventory.owned`
+   - current client implements this as a decoration drawer that updates `placedObjects[].itemId`
+   - current client also lets unowned slot-compatible items be bought with local coins, then added to `inventory.owned`
 
 2. Theme replacement
    - floor, wall, room color, bundled furniture set
@@ -134,7 +134,7 @@ Recommended staging:
 
 ## Shop Flow
 
-The current demo models the minimum commerce chain without real payment:
+The current prototype models the minimum commerce chain without real payment:
 
 - `itemCatalog` owns price, rarity, category, slot compatibility, and sprite metadata.
 - `inventory.owned` decides whether a user can equip an item.
@@ -145,7 +145,7 @@ Production should replace local coins with backend / wallet validation, but keep
 
 ## Persistence
 
-The demo writes a small save object to browser `localStorage`:
+The client writes a small save object to browser `localStorage`:
 
 - `inventory.owned`
 - `inventory.coins`
@@ -164,7 +164,7 @@ Static backgrounds are good for proving mood and layout, but weak for:
 - object collision and animation
 - furniture drag/drop
 
-The current demo should therefore be treated as a visual prototype plus data-model bridge, not as the final rendering architecture.
+The current client should therefore be treated as a visual prototype plus data-model bridge, not as the final rendering architecture.
 
 ## Farm Plot Model
 

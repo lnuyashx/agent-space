@@ -35,7 +35,7 @@ New sessions should start from `AGENTS.md`, `STATUS.md`, and `scripts/status.sh`
 
 ### Data / Game Model Agent
 
-- Split demo data into `items`, `inventory`, `sceneTemplate`, and `sceneSnapshot` modules.
+- Split prototype data into `items`, `inventory`, `sceneTemplate`, and `sceneSnapshot` modules.
 - Add local save migration/versioning for `localStorage`.
 - Model farm plot state and crop lifecycle.
 - Model room themes and bundled furniture sets.
