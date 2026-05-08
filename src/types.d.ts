@@ -11,6 +11,7 @@ export interface AgentSpaceData {
   assets: {
     agent: string;
     scenes: Record<string, string>;
+    atlases?: Record<string, AgentSpaceAtlas>;
   };
   itemCatalog: Record<string, AgentSpaceItem>;
   inventory: {
@@ -93,6 +94,19 @@ export interface AgentSpacePoint {
 export interface AgentSpaceRect {
   x: number;
   y: number;
+  w: number;
+  h: number;
+}
+
+export interface AgentSpaceAtlas {
+  key: string;
+  image: string;
+  frameSize?: AgentSpaceFrameSize;
+  frames?: Record<string, AgentSpaceRect>;
+  status?: string;
+}
+
+export interface AgentSpaceFrameSize {
   w: number;
   h: number;
 }

@@ -1,6 +1,14 @@
-import { Application, Assets, Container, Graphics, Sprite, Text, TextStyle } from "pixi.js";
-import type { Texture } from "pixi.js";
-import type { AgentSpaceData, AgentSpacePlacedObject, AgentSpacePoint, AgentSpaceScene } from "../types";
+import { Application, Assets, Container, Graphics, Rectangle, Sprite, Text, TextStyle, Texture } from "pixi.js";
+import type {
+  AgentSpaceAtlas,
+  AgentSpaceData,
+  AgentSpaceItem,
+  AgentSpacePlacedObject,
+  AgentSpacePoint,
+  AgentSpaceRect,
+  AgentSpaceScene,
+  AgentSpaceShape,
+} from "../types";
 
 interface PixiFoundationOptions {
   data: AgentSpaceData;
@@ -13,6 +21,16 @@ interface CoverRect {
   y: number;
   width: number;
   height: number;
+}
+
+interface ItemSpriteDescriptor {
+  atlasKey: string;
+  spriteId: string;
+  anchor: AgentSpacePoint;
+  fallback: {
+    color: string;
+    accent: string;
+  };
 }
 
 const PIXI_RENDERER_PARAM = "pixi";
@@ -59,6 +77,8 @@ class PixiScenePreview {
   private readonly world = new Container();
   private readonly labels = new Container();
   private readonly sceneTextures = new Map<string, Texture>();
+  private readonly atlasTextures = new Map<string, Texture>();
+  private readonly frameTextures = new Map<string, Texture>();
   private sceneSprite?: Sprite;
   private agentSprite?: Sprite;
 
@@ -73,7 +93,11 @@ class PixiScenePreview {
 
   async load(): Promise<void> {
     const scene = this.activeScene();
-    const [sceneTexture, agentTexture] = await Promise.all([this.sceneTexture(scene), Assets.load(this.data.assets.agent)]);
+    const [sceneTexture, agentTexture] = await Promise.all([
+      this.sceneTexture(scene),
+      Assets.load<Texture>(this.data.assets.agent),
+      this.ensureSceneAtlases(scene),
+    ]);
 
     this.sceneSprite = new Sprite(sceneTexture);
     this.world.addChild(this.sceneSprite);
@@ -86,22 +110,23 @@ class PixiScenePreview {
   async render(): Promise<void> {
     const scene = this.activeScene();
     const sceneTexture = await this.sceneTexture(scene);
+    await this.ensureSceneAtlases(scene);
     const bounds = this.stageBounds();
     this.labels.removeChildren();
     this.world.removeChildren();
 
-    if (this.sceneSprite) {
-      this.sceneSprite.texture = sceneTexture;
-      const cover = coverRect(this.sceneSprite.texture.width, this.sceneSprite.texture.height, bounds.width, bounds.height);
-      this.sceneSprite.position.set(cover.x, cover.y);
-      this.sceneSprite.width = cover.width;
-      this.sceneSprite.height = cover.height;
-      this.world.addChild(this.sceneSprite);
+    if (!this.sceneSprite) return;
 
-      this.drawObjects(scene, cover);
-      this.drawAgent(scene, cover);
-      this.drawModeLabel(bounds);
-    }
+    this.sceneSprite.texture = sceneTexture;
+    const cover = coverRect(this.sceneSprite.texture.width, this.sceneSprite.texture.height, bounds.width, bounds.height);
+    this.sceneSprite.position.set(cover.x, cover.y);
+    this.sceneSprite.width = cover.width;
+    this.sceneSprite.height = cover.height;
+    this.world.addChild(this.sceneSprite);
+
+    this.drawObjects(scene, cover);
+    this.drawAgent(scene, cover);
+    this.drawModeLabel(bounds);
   }
 
   private async sceneTexture(scene: AgentSpaceScene): Promise<Texture> {
@@ -118,36 +143,106 @@ class PixiScenePreview {
     return texture;
   }
 
+  private async ensureSceneAtlases(scene: AgentSpaceScene): Promise<void> {
+    const atlasKeys = new Set<string>();
+    Object.values(scene.placedObjects).forEach((object) => {
+      const item = this.data.itemCatalog[object.itemId];
+      if (item?.sprite?.atlasKey) atlasKeys.add(item.sprite.atlasKey);
+    });
+
+    const pending = [...atlasKeys].map(async (atlasKey) => {
+      if (this.atlasTextures.has(atlasKey)) return;
+      const atlas = this.atlasByKey(atlasKey);
+      if (!atlas?.image) return;
+      const texture = await Assets.load<Texture>(atlas.image);
+      this.atlasTextures.set(atlasKey, texture);
+    });
+    await Promise.all(pending);
+  }
+
+  private atlasByKey(atlasKey: string): AgentSpaceAtlas | null {
+    const atlases = this.data.assets.atlases || {};
+    for (const [manifestId, atlas] of Object.entries(atlases)) {
+      if (!atlas) continue;
+      if (atlas.key === atlasKey || manifestId === atlasKey) return atlas;
+    }
+    return null;
+  }
+
   private drawObjects(scene: AgentSpaceScene, cover: CoverRect): void {
     Object.values(scene.placedObjects).forEach((object) => {
-      const marker = this.objectMarker(object, cover);
-      this.world.addChild(marker);
+      const sprite = this.objectVisual(object, cover);
+      this.world.addChild(sprite);
     });
   }
 
-  private objectMarker(object: AgentSpacePlacedObject, cover: CoverRect): Container {
+  private objectVisual(object: AgentSpacePlacedObject, cover: CoverRect): Container {
     const container = new Container();
     const point = sceneToPixi(object.point, cover);
     const item = this.data.itemCatalog[object.itemId];
-    const visual = itemSpriteVisual(item);
-    const color = parseCssColor(visual.color);
-    const accent = parseCssColor(visual.accent);
-
-    const shadow = new Graphics().ellipse(0, 12, 24, 7).fill({ color: 0x241810, alpha: 0.18 });
-    const body = new Graphics()
-      .roundRect(-24, -22, 48, 32, 5)
-      .fill({ color, alpha: 0.76 })
-      .stroke({ color: 0x2d1f17, alpha: 0.24, width: 1 });
-    const face = new Graphics().roundRect(-15, -14, 30, 13, 3).fill({ color: accent, alpha: 0.88 });
+    const spriteDescriptor = itemSpriteDescriptor(item);
+    const frameTexture = this.resolveFrameTexture(spriteDescriptor.atlasKey, spriteDescriptor.spriteId);
 
     container.position.set(point.x, point.y);
-    container.addChild(shadow, body, face);
+    container.addChild(new Graphics().ellipse(0, 12, 24, 7).fill({ color: 0x241810, alpha: 0.18 }));
+
+    if (frameTexture) {
+      const sprite = new Sprite(frameTexture);
+      sprite.anchor.set(spriteDescriptor.anchor.x, spriteDescriptor.anchor.y);
+      const scale = this.objectFrameScale(object, cover, frameTexture.width, frameTexture.height);
+      sprite.scale.set(scale);
+      container.addChild(sprite);
+    } else {
+      const color = parseCssColor(spriteDescriptor.fallback.color);
+      const accent = parseCssColor(spriteDescriptor.fallback.accent);
+      const body = new Graphics()
+        .roundRect(-24, -22, 48, 32, 5)
+        .fill({ color, alpha: 0.76 })
+        .stroke({ color: 0x2d1f17, alpha: 0.24, width: 1 });
+      const face = new Graphics().roundRect(-15, -14, 30, 13, 3).fill({ color: accent, alpha: 0.88 });
+      container.addChild(body, face);
+    }
+
     container.eventMode = "static";
     container.cursor = "pointer";
     container.on("pointertap", () => {
       this.showFloatingLabel(object.label, point);
     });
     return container;
+  }
+
+  private resolveFrameTexture(atlasKey: string, spriteId: string): Texture | null {
+    const cacheKey = `${atlasKey}:${spriteId}`;
+    const cached = this.frameTextures.get(cacheKey);
+    if (cached) return cached;
+
+    const atlas = this.atlasByKey(atlasKey);
+    const frame = atlas?.frames?.[spriteId];
+    const atlasTexture = this.atlasTextures.get(atlasKey);
+    if (!atlasTexture || !frame) return null;
+
+    const texture = new Texture({
+      source: atlasTexture.source,
+      frame: new Rectangle(frame.x, frame.y, frame.w, frame.h),
+    });
+    this.frameTextures.set(cacheKey, texture);
+    return texture;
+  }
+
+  private objectFrameScale(
+    object: AgentSpacePlacedObject,
+    cover: CoverRect,
+    frameWidth: number,
+    frameHeight: number,
+  ): number {
+    const bounds = zoneBounds(object);
+    if (!bounds.w || !bounds.h) return 0.78;
+    const p1 = sceneToPixi({ x: bounds.x, y: bounds.y }, cover);
+    const p2 = sceneToPixi({ x: bounds.x + bounds.w, y: bounds.y + bounds.h }, cover);
+    const width = Math.abs(p2.x - p1.x);
+    const height = Math.abs(p2.y - p1.y);
+    const scale = Math.min(width / frameWidth, height / frameHeight);
+    return clamp(scale, 0.5, 1.16);
   }
 
   private drawAgent(scene: AgentSpaceScene, cover: CoverRect): void {
@@ -227,16 +322,70 @@ function sceneToPixi(point: AgentSpacePoint, cover: CoverRect): AgentSpacePoint 
   };
 }
 
+function zoneBounds(zone: AgentSpacePlacedObject): AgentSpaceRect {
+  const bounds = zoneShapes(zone).map(shapeBounds);
+  if (!bounds.length) return zone.rect || { x: 0, y: 0, w: 0, h: 0 };
+  const x = Math.min(...bounds.map((rect) => rect.x));
+  const y = Math.min(...bounds.map((rect) => rect.y));
+  const right = Math.max(...bounds.map((rect) => rect.x + rect.w));
+  const bottom = Math.max(...bounds.map((rect) => rect.y + rect.h));
+  return {
+    x,
+    y,
+    w: right - x,
+    h: bottom - y,
+  };
+}
+
+function zoneShapes(zone: AgentSpacePlacedObject): AgentSpaceShape[] {
+  if (zone.hitAreas) return zone.hitAreas;
+  if (zone.polygon) return [{ type: "polygon", points: zone.polygon }];
+  if (zone.rect) return [{ type: "rect", ...zone.rect }];
+  return [];
+}
+
+function shapeBounds(shape: AgentSpaceShape): AgentSpaceRect {
+  if (shape.type === "rect") return shape;
+  if (shape.type === "polygon") {
+    const xs = shape.points.map((point) => point.x);
+    const ys = shape.points.map((point) => point.y);
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+    const w = Math.max(...xs) - x;
+    const h = Math.max(...ys) - y;
+    return { x, y, w, h };
+  }
+  const rx = shape.rx || (shape.w || 0) / 2;
+  const ry = shape.ry || (shape.h || 0) / 2;
+  const cx = shape.cx ?? (shape.x || 0) + rx;
+  const cy = shape.cy ?? (shape.y || 0) + ry;
+  return {
+    x: cx - rx,
+    y: cy - ry,
+    w: rx * 2,
+    h: ry * 2,
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function parseCssColor(value: string): number {
   const normalized = value.replace("#", "");
   const parsed = Number.parseInt(normalized.length === 3 ? normalized.replace(/(.)/g, "$1$1") : normalized, 16);
   return Number.isFinite(parsed) ? parsed : 0xd96f42;
 }
 
-function itemSpriteVisual(item: AgentSpaceData["itemCatalog"][string] | undefined): { color: string; accent: string } {
+function itemSpriteDescriptor(item: AgentSpaceItem | undefined): ItemSpriteDescriptor {
   const fallback = item?.sprite?.fallback;
   return {
-    color: fallback?.color || "#d96f42",
-    accent: fallback?.accent || "#fff3d8",
+    atlasKey: item?.sprite?.atlasKey || "prototype-furniture",
+    spriteId: item?.sprite?.spriteId || `${item?.category || "item"}.fallback`,
+    anchor: item?.sprite?.anchor || { x: 0.5, y: 1 },
+    fallback: {
+      color: fallback?.color || "#d96f42",
+      accent: fallback?.accent || "#fff3d8",
+    },
   };
 }
