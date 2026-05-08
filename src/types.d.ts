@@ -29,10 +29,17 @@ export interface AgentSpaceItem {
   price: number;
   slots?: string[];
   actions?: string[];
-  visual?: {
-    color: string;
-    accent: string;
-    short: string;
+  sprite?: {
+    atlasKey: string;
+    spriteId: string;
+    anchor: AgentSpacePoint;
+    fallback?: {
+      kind: string;
+      color: string;
+      accent: string;
+      short: string;
+      variant?: string;
+    };
   };
 }
 
@@ -61,6 +68,9 @@ export interface AgentSpaceAgent {
 export interface AgentSpacePlacedObject {
   itemId: string;
   defaultItemId?: string;
+  interactionPoint?: AgentSpacePoint;
+  farmPlotId?: string;
+  defaultFarmStateId?: string;
   room?: string;
   slot: string;
   type: string;
@@ -91,4 +101,3 @@ export type AgentSpaceShape =
   | ({ type: "rect" } & AgentSpaceRect)
   | { type: "polygon"; points: AgentSpacePoint[] }
   | { type: "ellipse"; x?: number; y?: number; w?: number; h?: number; cx?: number; cy?: number; rx?: number; ry?: number };
-

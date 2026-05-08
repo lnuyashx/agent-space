@@ -19,10 +19,48 @@ else
   exit 127
 fi
 
-set +e
-OUTPUT="$("$CHROME" --headless=new --disable-gpu --no-sandbox --dump-dom "$TEST_URL" 2>&1)"
-CHROME_STATUS=$?
-set -e
+run_hitarea_check() {
+  local profile_dir
+  profile_dir="$(mktemp -d "${TMPDIR:-/tmp}/agent-space-hitareas-XXXXXX")"
+  local output
+  local status
+  set +e
+  output="$(
+    "$CHROME" \
+      --headless=new \
+      --disable-gpu \
+      --disable-dev-shm-usage \
+      --no-sandbox \
+      --virtual-time-budget=4000 \
+      --user-data-dir="$profile_dir" \
+      --dump-dom \
+      "$TEST_URL" 2>&1
+  )"
+  status=$?
+  set -e
+  rm -rf "$profile_dir"
+  printf '%s' "$output"
+  return "$status"
+}
+
+OUTPUT=""
+CHROME_STATUS=1
+for attempt in 1 2 3; do
+  set +e
+  OUTPUT="$(run_hitarea_check)"
+  CHROME_STATUS=$?
+  set -e
+  if [[ "$CHROME_STATUS" -ne 0 ]] && grep -q "HITAREA_TEST_PASS" <<<"$OUTPUT"; then
+    CHROME_STATUS=0
+  fi
+  if [[ "$CHROME_STATUS" -eq 0 ]]; then
+    break
+  fi
+  if [[ "$CHROME_STATUS" -ne 134 || "$attempt" -eq 3 ]]; then
+    break
+  fi
+  sleep 2
+done
 
 if [[ "$CHROME_STATUS" -ne 0 ]]; then
   printf '%s\n' "$OUTPUT"

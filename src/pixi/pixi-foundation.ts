@@ -129,8 +129,9 @@ class PixiScenePreview {
     const container = new Container();
     const point = sceneToPixi(object.point, cover);
     const item = this.data.itemCatalog[object.itemId];
-    const color = parseCssColor(item?.visual?.color || "#d96f42");
-    const accent = parseCssColor(item?.visual?.accent || "#fff3d8");
+    const visual = itemSpriteVisual(item);
+    const color = parseCssColor(visual.color);
+    const accent = parseCssColor(visual.accent);
 
     const shadow = new Graphics().ellipse(0, 12, 24, 7).fill({ color: 0x241810, alpha: 0.18 });
     const body = new Graphics()
@@ -230,4 +231,12 @@ function parseCssColor(value: string): number {
   const normalized = value.replace("#", "");
   const parsed = Number.parseInt(normalized.length === 3 ? normalized.replace(/(.)/g, "$1$1") : normalized, 16);
   return Number.isFinite(parsed) ? parsed : 0xd96f42;
+}
+
+function itemSpriteVisual(item: AgentSpaceData["itemCatalog"][string] | undefined): { color: string; accent: string } {
+  const fallback = item?.sprite?.fallback;
+  return {
+    color: fallback?.color || "#d96f42",
+    accent: fallback?.accent || "#fff3d8",
+  };
 }
