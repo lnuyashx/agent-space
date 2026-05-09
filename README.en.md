@@ -57,6 +57,17 @@ The current phase upgrades the Web client from static canvas prototype to Vite +
 
 See [ROADMAP.en.md](ROADMAP.en.md) and [docs/product-evolution.en.md](docs/product-evolution.en.md).
 
+## Local Bridge (Experimental)
+
+```sh
+npm run bridge:start
+```
+
+- WebSocket: `ws://127.0.0.1:8787/bridge`
+- Health: `http://127.0.0.1:8787/healthz`
+- Protocol docs: `docs/asp-v0.1.zh-CN.md` (English: `docs/asp-v0.1.en.md`)
+- SQLite default path: `bridge/.runtime/agent-space-bridge.sqlite`
+
 ## Local Validation
 
 ```sh

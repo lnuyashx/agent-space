@@ -86,6 +86,7 @@ Current data model:
 - Local shop loop: unowned compatible furniture appears in the same drawer, can be bought with demo coins, then equipped
 - Browser `localStorage` save: owned items, coins, and scene placed-object item ids persist across refresh with `schemaVersion: 2`
 - Settings drawer save debug footer: shows save schema/status/key and can reset local save state
+- Local Bridge v0.1 bootstrap under `bridge/`: WebSocket endpoint, SQLite persistence, and minimum ASP-style methods (`ping`, snapshot get/save, buy, equip, farm action, reset)
 - Farm plot state model: `empty -> seeded -> growing -> ready -> withered`, with owner actions and neighbor actions documented in `docs/farm-plot-state-model.zh-CN.md`
 - Room theme and bundle model: themes define style tokens and renderer requirements; bundles grant furniture and write `sceneSnapshot.themeId` plus placed object item ids
 - Vite + TypeScript project foundation
@@ -120,6 +121,13 @@ Browser smoke coverage:
 - `tests/smoke-browser.html` loads the real `index.html` in a browser frame and simulates the core user path.
 - `scripts/check-smoke.sh` verifies app boot, object hit testing, door navigation, decoration drawer, shop purchase, and `localStorage` reload persistence without storing screenshots by default.
 
+Local Bridge bootstrap:
+
+- `bridge/server.mjs` runs a minimal WebSocket + SQLite local backend.
+- `bridge/sqlite-store.mjs` stores bridge snapshot state in a single-row SQLite table.
+- `bridge/defaults.mjs` composes default bridge snapshot from `data/*.js` browser data scripts.
+- `docs/asp-v0.1.zh-CN.md` and `docs/asp-v0.1.en.md` define the v0.1 protocol envelope and methods.
+
 ## Resume Instructions
 
 When continuing this project, keep the same architecture:
@@ -131,6 +139,7 @@ When continuing this project, keep the same architecture:
 - Farm plot objects should use stable `farmPlotId` values; future saves should store farm snapshots by that id rather than by canvas position.
 - Theme bundle ownership should stay separate from item ownership; equipping a bundle writes a theme id plus compatible slot item ids.
 - Local demo persistence uses `localStorage`; production should replace it with Local Bridge / SQLite / Hub sync.
+- Local Bridge v0.1 endpoint defaults to `ws://127.0.0.1:8787/bridge` with health check at `/healthz`.
 - Current save key is `agent-space-demo-save`; old `agent-space-demo-save-v1` can be read and is removed after the next successful v2 save.
 - Hotspots must stay aligned with the visible art object they represent.
 - New objects should use `hitAreas` polygons/rects/ellipses that trace the actual art body.
