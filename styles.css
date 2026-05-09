@@ -158,6 +158,53 @@ button:hover {
   font-size: 18px;
 }
 
+.farm-actions {
+  left: 14px;
+  bottom: 14px;
+  z-index: 4;
+  display: grid;
+  gap: 8px;
+  width: min(320px, calc(100vw - 28px));
+  padding: 10px 12px;
+}
+
+.farm-actions[aria-hidden="true"] {
+  display: none;
+}
+
+.farm-actions strong {
+  font-size: 13px;
+}
+
+.farm-actions small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.farm-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.farm-action-buttons button {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.94);
+  font-size: 12px;
+}
+
+.farm-action-buttons button[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.farm-action-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .agent-chip {
   display: grid;
   grid-template-columns: 54px 1fr;
@@ -610,6 +657,12 @@ button:hover {
     left: 14px;
     max-width: calc(100vw - 28px);
     transform: none;
+  }
+
+  .farm-actions {
+    bottom: 12px;
+    left: 12px;
+    width: min(360px, calc(100vw - 24px));
   }
 
   .conversation-dock {
