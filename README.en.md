@@ -67,6 +67,7 @@ npm run bridge:start
 - Health: `http://127.0.0.1:8787/healthz`
 - Protocol docs: `docs/asp-v0.1.zh-CN.md` (English: `docs/asp-v0.1.en.md`)
 - SQLite default path: `bridge/.runtime/agent-space-bridge.sqlite`
+- Frontend now uses bridge-first write paths (buy, equip, reset) with automatic `localStorage` fallback when bridge is unavailable.
 
 ## Local Validation
 

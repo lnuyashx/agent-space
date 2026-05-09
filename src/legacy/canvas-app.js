@@ -6,12 +6,18 @@ const gameData = window.AGENT_SPACE_DATA;
 const SAVE_SCHEMA_VERSION = 2;
 const SAVE_KEY = "agent-space-demo-save";
 const LEGACY_SAVE_KEYS = ["agent-space-demo-save-v1"];
+const BRIDGE_SAVE_KEY = "agent-space-local-bridge";
+const BRIDGE_TIMEOUT_MS = 2200;
 const saveDebugState = {
   key: SAVE_KEY,
   schemaVersion: SAVE_SCHEMA_VERSION,
   status: "fresh",
   savedAt: null,
   error: null,
+};
+const bridgeState = {
+  url: resolveBridgeUrl(),
+  farmSnapshot: { plots: {} },
 };
 const savedState = readSavedState();
 
@@ -212,6 +218,15 @@ function applySavedSceneSnapshot(sceneSnapshot) {
   });
 }
 
+function applyBridgeSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  applySavedInventory(snapshot.inventory);
+  applySavedSceneSnapshot(snapshot.sceneSnapshot);
+  if (snapshot.farmSnapshot && typeof snapshot.farmSnapshot === "object") {
+    bridgeState.farmSnapshot = cloneData(snapshot.farmSnapshot);
+  }
+}
+
 function buildSceneSnapshot() {
   return Object.fromEntries(
     Object.entries(scenes).map(([sceneId, scene]) => [
@@ -225,44 +240,104 @@ function buildSceneSnapshot() {
   );
 }
 
-function saveGameState() {
-  const savedAt = new Date().toISOString();
-  const sceneSnapshot = buildSceneSnapshot();
+function buildFullSnapshot(savedAt = new Date().toISOString()) {
+  return {
+    inventory: {
+      owned: cloneData(gameData.inventory.owned),
+      coins: gameData.inventory.coins,
+    },
+    sceneSnapshot: buildSceneSnapshot(),
+    farmSnapshot: cloneData(bridgeState.farmSnapshot || { plots: {} }),
+    savedAt,
+  };
+}
+
+function writeLocalMirror(snapshot, savedAt) {
   const payload = {
     schemaVersion: SAVE_SCHEMA_VERSION,
     savedAt,
-    inventory: {
-      owned: gameData.inventory.owned,
-      coins: gameData.inventory.coins,
-    },
-    sceneSnapshot,
+    inventory: snapshot.inventory,
+    sceneSnapshot: snapshot.sceneSnapshot,
   };
+  window.localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+  LEGACY_SAVE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+}
+
+function updateSaveDebug({ key, status, savedAt, error = null }) {
+  saveDebugState.key = key;
+  saveDebugState.schemaVersion = SAVE_SCHEMA_VERSION;
+  saveDebugState.status = status;
+  saveDebugState.savedAt = savedAt || null;
+  saveDebugState.error = error;
+  renderSaveDebug();
+}
+
+async function saveGameState() {
+  const savedAt = new Date().toISOString();
+  const snapshot = buildFullSnapshot(savedAt);
   try {
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
-    LEGACY_SAVE_KEYS.forEach((key) => window.localStorage.removeItem(key));
-    saveDebugState.key = SAVE_KEY;
-    saveDebugState.schemaVersion = SAVE_SCHEMA_VERSION;
-    saveDebugState.status = "saved";
-    saveDebugState.savedAt = savedAt;
-    saveDebugState.error = null;
-    renderSaveDebug();
+    const result = await bridgeRequest("snapshot.save", { snapshot });
+    const bridgeSnapshot = result?.snapshot || snapshot;
+    const bridgeSavedAt = result?.savedAt || bridgeSnapshot.savedAt || savedAt;
+    applyBridgeSnapshot(bridgeSnapshot);
+    writeLocalMirror(bridgeSnapshot, bridgeSavedAt);
+    updateSaveDebug({
+      key: BRIDGE_SAVE_KEY,
+      status: "saved",
+      savedAt: bridgeSavedAt,
+      error: null,
+    });
+    return true;
   } catch (error) {
-    saveDebugState.status = "invalid";
-    saveDebugState.error = error.message;
-    renderSaveDebug();
-    console.warn("Failed to save Agent Space state", error);
+    try {
+      writeLocalMirror(snapshot, savedAt);
+      updateSaveDebug({
+        key: SAVE_KEY,
+        status: "saved",
+        savedAt,
+        error: `bridge offline: ${error.message}`,
+      });
+      return false;
+    } catch (localError) {
+      saveDebugState.status = "invalid";
+      saveDebugState.error = localError.message;
+      renderSaveDebug();
+      console.warn("Failed to save Agent Space state", localError);
+      return false;
+    }
   }
 }
 
-function resetLocalSave() {
+async function resetLocalSave() {
   const confirmed = window.confirm("重置本地存档？购买记录、金币和家具摆放会恢复默认。");
   if (!confirmed) return;
+  try {
+    const result = await bridgeRequest("save.reset");
+    const resetSnapshot = result?.snapshot;
+    if (!resetSnapshot) throw new Error("Bridge reset returned empty snapshot.");
+    const resetSavedAt = result?.savedAt || new Date().toISOString();
+    applyBridgeSnapshot(resetSnapshot);
+    writeLocalMirror(resetSnapshot, resetSavedAt);
+    updateSaveDebug({
+      key: BRIDGE_SAVE_KEY,
+      status: "saved",
+      savedAt: resetSavedAt,
+      error: null,
+    });
+    renderStatus();
+    if (state.decorating) renderDecoratePanel();
+    toast("本地存档已通过 Local Bridge 重置");
+    return;
+  } catch (bridgeError) {
+    console.warn("Failed to reset through Local Bridge, fallback to localStorage", bridgeError);
+  }
+
   try {
     [SAVE_KEY, ...LEGACY_SAVE_KEYS].forEach((key) => window.localStorage.removeItem(key));
     toast("本地存档已重置");
     window.setTimeout(() => window.location.reload(), 420);
-  } catch (error) {
-    console.warn("Failed to reset Agent Space save state", error);
+  } catch (localError) {
+    console.warn("Failed to reset Agent Space save state", localError);
     toast("重置失败，请查看控制台");
   }
 }
@@ -984,7 +1059,9 @@ function renderDecoratePanel() {
     ].filter(Boolean).join(" ");
     button.type = "button";
     button.innerHTML = `${swatchMarkup(item)}<span class="decor-copy"><strong>${item.label}</strong><span>${itemCommerceText(itemId, item)}</span><i class="rarity">${locked ? "SHOP" : item.rarity}</i></span>`;
-    button.addEventListener("click", () => replaceDecorItem(itemId));
+    button.addEventListener("click", () => {
+      void replaceDecorItem(itemId);
+    });
     el.decorateItemList.append(button);
   });
 }
@@ -1006,20 +1083,25 @@ function closeDecoratePanel() {
   el.decorateDrawer.setAttribute("aria-hidden", "true");
 }
 
-function replaceDecorItem(itemId) {
+async function replaceDecorItem(itemId) {
   const zone = activeScene().zones[state.selectedDecorObjectId];
   const item = gameData.itemCatalog[itemId];
   if (!zone || !item || !item.slots?.includes(zone.slot)) return;
-  if (!ensureOwned(itemId, item)) return;
+  if (!(await ensureOwned(itemId, item))) return;
   zone.itemId = itemId;
   zone.label = item.label;
   state.hotspotPulse = { zone, until: Date.now() + 900 };
-  saveGameState();
+  const synced = await syncEquipToBridge(state.currentScene, zone.objectId, itemId);
+  if (!synced) {
+    await saveGameState();
+  } else {
+    writeLocalMirror(buildFullSnapshot(), new Date().toISOString());
+  }
   renderDecoratePanel();
   toast(`${zone.slot} 已替换为 ${item.label}`);
 }
 
-function ensureOwned(itemId, item) {
+async function ensureOwned(itemId, item) {
   if (ownedCount(itemId) > 0) return true;
   const price = itemPrice(item);
   if (!price) {
@@ -1030,11 +1112,31 @@ function ensureOwned(itemId, item) {
     toast(`金币不足，还差 ${price - gameData.inventory.coins}`);
     return false;
   }
-  gameData.inventory.coins -= price;
-  gameData.inventory.owned[itemId] = 1;
-  renderStatus();
-  toast(`已购买 ${item.label}`);
-  return true;
+  try {
+    const result = await bridgeRequest("inventory.buy", {
+      itemId,
+      count: 1,
+      price,
+    });
+    gameData.inventory.coins = Math.max(0, Number(result?.coins) || 0);
+    gameData.inventory.owned[itemId] = Math.max(1, Number(result?.owned) || 1);
+    writeLocalMirror(buildFullSnapshot(), result?.savedAt || new Date().toISOString());
+    updateSaveDebug({
+      key: BRIDGE_SAVE_KEY,
+      status: "saved",
+      savedAt: result?.savedAt || new Date().toISOString(),
+      error: null,
+    });
+    renderStatus();
+    toast(`已购买 ${item.label}`);
+    return true;
+  } catch (error) {
+    gameData.inventory.coins -= price;
+    gameData.inventory.owned[itemId] = 1;
+    renderStatus();
+    toast(`已购买 ${item.label}`);
+    return true;
+  }
 }
 
 function setPreview(zone) {
@@ -1248,6 +1350,135 @@ function renderStatus() {
   renderSaveDebug();
 }
 
+function resolveBridgeUrl() {
+  const query = new URLSearchParams(window.location.search);
+  const override = query.get("bridge");
+  if (override === "off") return null;
+  if (override) return override;
+  return "ws://127.0.0.1:8787/bridge";
+}
+
+function bridgeRequest(method, params = {}) {
+  if (!bridgeState.url) {
+    return Promise.reject(new Error("Local Bridge disabled"));
+  }
+
+  return new Promise((resolve, reject) => {
+    const requestId = `bridge-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const socket = new window.WebSocket(bridgeState.url);
+    let settled = false;
+    const timeout = window.setTimeout(() => {
+      finalizeReject(new Error("Local Bridge request timeout"));
+    }, BRIDGE_TIMEOUT_MS);
+
+    function finalizeResolve(value) {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      try {
+        socket.close();
+      } catch {
+        // no-op
+      }
+      resolve(value);
+    }
+
+    function finalizeReject(error) {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      try {
+        socket.close();
+      } catch {
+        // no-op
+      }
+      reject(error);
+    }
+
+    socket.addEventListener("open", () => {
+      socket.send(
+        JSON.stringify({
+          id: requestId,
+          method,
+          params,
+        }),
+      );
+    });
+
+    socket.addEventListener("message", (event) => {
+      let parsed;
+      try {
+        parsed = JSON.parse(event.data);
+      } catch (error) {
+        finalizeReject(new Error(`Local Bridge invalid JSON: ${error.message}`));
+        return;
+      }
+
+      if (parsed?.event === "bridge.ready") return;
+      if (parsed?.id !== requestId) return;
+      if (parsed?.ok) {
+        finalizeResolve(parsed.result || {});
+        return;
+      }
+      const message = parsed?.error?.message || "Local Bridge request failed";
+      finalizeReject(new Error(message));
+    });
+
+    socket.addEventListener("error", () => {
+      finalizeReject(new Error("Local Bridge connection failed"));
+    });
+
+    socket.addEventListener("close", () => {
+      if (!settled) {
+        finalizeReject(new Error("Local Bridge closed before response"));
+      }
+    });
+  });
+}
+
+async function hydrateFromBridge() {
+  if (!bridgeState.url) return;
+  try {
+    const result = await bridgeRequest("snapshot.get");
+    if (!result?.snapshot) return;
+    applyBridgeSnapshot(result.snapshot);
+    updateSaveDebug({
+      key: BRIDGE_SAVE_KEY,
+      status: "loaded",
+      savedAt: result.savedAt || result.snapshot.savedAt || new Date().toISOString(),
+      error: null,
+    });
+    renderStatus();
+    if (state.decorating) renderDecoratePanel();
+  } catch (error) {
+    console.warn("Local Bridge snapshot hydration skipped", error.message);
+  }
+}
+
+async function syncEquipToBridge(sceneId, objectId, itemId) {
+  try {
+    const result = await bridgeRequest("scene.equip", {
+      sceneId,
+      objectId,
+      itemId,
+    });
+    updateSaveDebug({
+      key: BRIDGE_SAVE_KEY,
+      status: "saved",
+      savedAt: result?.savedAt || new Date().toISOString(),
+      error: null,
+    });
+    return true;
+  } catch (error) {
+    console.warn("Failed to sync equip to Local Bridge", error.message);
+    return false;
+  }
+}
+
+function cloneData(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function saveStatusText() {
   if (saveDebugState.status === "loaded") return "已加载";
   if (saveDebugState.status === "migrated") return "已迁移旧存档";
@@ -1366,7 +1597,9 @@ document.querySelector("#closeArtifactBtn").addEventListener("click", () => {
 });
 
 document.querySelector("#closeDecorateBtn").addEventListener("click", closeDecoratePanel);
-el.resetSaveBtn.addEventListener("click", resetLocalSave);
+el.resetSaveBtn.addEventListener("click", () => {
+  void resetLocalSave();
+});
 
 document.querySelector("#copyArtifactBtn").addEventListener("click", async () => {
   if (!state.artifact) return;
@@ -1404,4 +1637,5 @@ window.addEventListener("hashchange", () => {
 
 renderStatus();
 switchAgent("Aria");
+void hydrateFromBridge();
 requestAnimationFrame(draw);

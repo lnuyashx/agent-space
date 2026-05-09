@@ -126,6 +126,7 @@ npm run bridge:start
 - Health: `http://127.0.0.1:8787/healthz`
 - 协议文档：`docs/asp-v0.1.zh-CN.md`（英文：`docs/asp-v0.1.en.md`）
 - SQLite 默认路径：`bridge/.runtime/agent-space-bridge.sqlite`
+- 当前前端已接入 bridge-first 写路径（购买、装备、重置），bridge 不可用时自动回退到 `localStorage`
 
 ## 暂缓范围
 
