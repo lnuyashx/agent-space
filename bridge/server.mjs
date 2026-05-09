@@ -135,10 +135,13 @@ function handlePing() {
 
 function handleSnapshotGet() {
   const current = store.readState();
+  const next = deepClone(current.payload);
+  const lifecycleChanged = resolveFarmLifecycleForSnapshot(next);
+  const snapshot = lifecycleChanged ? store.writeState(next, current.schemaVersion) : current;
   return {
-    schemaVersion: current.schemaVersion,
-    savedAt: current.savedAt,
-    snapshot: current.payload,
+    schemaVersion: snapshot.schemaVersion,
+    savedAt: snapshot.savedAt,
+    snapshot: snapshot.payload,
   };
 }
 
@@ -241,6 +244,7 @@ function handleFarmAction(params) {
 
   const current = store.readState();
   const next = deepClone(current.payload);
+  resolveFarmLifecycleForSnapshot(next);
   const plot = next.farmSnapshot?.plots?.[plotId];
   if (!plot) throw new BridgeError("NOT_FOUND", `Unknown plotId: ${plotId}`);
 
@@ -346,6 +350,52 @@ function asNonEmptyString(value, message) {
     throw new BridgeError("INVALID_PARAMS", message);
   }
   return value;
+}
+
+function resolveFarmLifecycleForSnapshot(snapshot, nowIso = new Date().toISOString()) {
+  const plots = snapshot?.farmSnapshot?.plots;
+  if (!plots || typeof plots !== "object") return false;
+  const nowMs = Date.parse(nowIso);
+  if (!Number.isFinite(nowMs)) return false;
+  let changed = false;
+  Object.values(plots).forEach((plot) => {
+    if (resolveFarmPlotLifecycle(plot, nowMs, nowIso)) {
+      changed = true;
+    }
+  });
+  if (changed) {
+    snapshot.savedAt = nowIso;
+  }
+  return changed;
+}
+
+function resolveFarmPlotLifecycle(plot, nowMs, nowIso) {
+  if (!plot || typeof plot !== "object") return false;
+  if (!plot.cropId || !plot.plantedAt) return false;
+
+  const crop = gameData.farm?.crops?.[plot.cropId];
+  const growMinutes = Number(crop?.growMinutes);
+  const readyWindowMinutes = Number(crop?.readyWindowMinutes);
+  const plantedAtMs = Date.parse(plot.plantedAt);
+  if (!Number.isFinite(growMinutes) || !Number.isFinite(plantedAtMs)) return false;
+
+  const readyAtMs = plantedAtMs + growMinutes * 60 * 1000;
+  const witherAtMs = readyAtMs + readyWindowMinutes * 60 * 1000;
+  let changed = false;
+
+  if ((plot.state === "seeded" || plot.state === "growing") && nowMs >= readyAtMs) {
+    plot.state = "ready";
+    plot.updatedAt = nowIso;
+    changed = true;
+  }
+
+  if (plot.state === "ready" && Number.isFinite(readyWindowMinutes) && nowMs >= witherAtMs) {
+    plot.state = "withered";
+    plot.updatedAt = nowIso;
+    changed = true;
+  }
+
+  return changed;
 }
 
 function deepClone(value) {

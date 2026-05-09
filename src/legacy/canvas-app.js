@@ -19,6 +19,13 @@ const bridgeState = {
   url: resolveBridgeUrl(),
   farmSnapshot: { plots: {} },
 };
+const FARM_ACTION_LABELS = {
+  plant: "播种",
+  water: "浇水",
+  fertilize: "施肥",
+  harvest: "收获",
+  clear: "清理",
+};
 const savedState = readSavedState();
 
 const sceneImages = Object.fromEntries(
@@ -76,6 +83,8 @@ Object.values(scenes).forEach((scene) => {
   });
 });
 applySavedSceneSnapshot(savedState.sceneSnapshot);
+applySavedFarmSnapshot(savedState.farmSnapshot);
+ensureFarmSnapshotShape();
 
 const initialScene = window.location.hash === "#yard" ? "yard" : "indoor";
 
@@ -222,9 +231,77 @@ function applyBridgeSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return;
   applySavedInventory(snapshot.inventory);
   applySavedSceneSnapshot(snapshot.sceneSnapshot);
-  if (snapshot.farmSnapshot && typeof snapshot.farmSnapshot === "object") {
-    bridgeState.farmSnapshot = cloneData(snapshot.farmSnapshot);
+  applySavedFarmSnapshot(snapshot.farmSnapshot);
+  ensureFarmSnapshotShape();
+}
+
+function buildDefaultFarmPlots(nowIso = new Date().toISOString()) {
+  const farmDefault = cloneData(gameData.farm?.defaultPlotSnapshot || { state: "empty" });
+  const plots = {};
+
+  Object.values(scenes).forEach((scene) => {
+    Object.values(scene.zones).forEach((zone) => {
+      const plotId = zone?.farmPlotId;
+      if (!plotId || plots[plotId]) return;
+      plots[plotId] = normalizeFarmPlot({
+        ...farmDefault,
+        state: zone.defaultFarmStateId || farmDefault.state || "empty",
+        updatedAt: nowIso,
+      });
+    });
+  });
+
+  return plots;
+}
+
+function normalizeFarmPlot(plot) {
+  const farmDefault = cloneData(gameData.farm?.defaultPlotSnapshot || { state: "empty" });
+  const merged = {
+    ...farmDefault,
+    ...(plot && typeof plot === "object" ? plot : {}),
+  };
+  if (!merged.state || typeof merged.state !== "string") {
+    merged.state = farmDefault.state || "empty";
   }
+  if (!Array.isArray(merged.neighborHelps)) {
+    merged.neighborHelps = [];
+  }
+  if (!Array.isArray(merged.stolenBy)) {
+    merged.stolenBy = [];
+  }
+  return merged;
+}
+
+function ensureFarmSnapshotShape(nowIso = new Date().toISOString()) {
+  const defaults = buildDefaultFarmPlots(nowIso);
+  const currentPlots = bridgeState.farmSnapshot?.plots && typeof bridgeState.farmSnapshot.plots === "object"
+    ? bridgeState.farmSnapshot.plots
+    : {};
+  const plots = {};
+
+  Object.entries(defaults).forEach(([plotId, defaultPlot]) => {
+    plots[plotId] = normalizeFarmPlot({
+      ...defaultPlot,
+      ...(currentPlots[plotId] || {}),
+    });
+  });
+
+  Object.entries(currentPlots).forEach(([plotId, plot]) => {
+    if (plots[plotId]) return;
+    plots[plotId] = normalizeFarmPlot(plot);
+  });
+
+  bridgeState.farmSnapshot = { plots };
+}
+
+function applySavedFarmSnapshot(farmSnapshot) {
+  if (!farmSnapshot || typeof farmSnapshot !== "object") return;
+  if (!farmSnapshot.plots || typeof farmSnapshot.plots !== "object") return;
+  bridgeState.farmSnapshot = {
+    plots: Object.fromEntries(
+      Object.entries(farmSnapshot.plots).map(([plotId, plot]) => [plotId, normalizeFarmPlot(plot)]),
+    ),
+  };
 }
 
 function buildSceneSnapshot() {
@@ -241,6 +318,7 @@ function buildSceneSnapshot() {
 }
 
 function buildFullSnapshot(savedAt = new Date().toISOString()) {
+  ensureFarmSnapshotShape(savedAt);
   return {
     inventory: {
       owned: cloneData(gameData.inventory.owned),
@@ -258,6 +336,7 @@ function writeLocalMirror(snapshot, savedAt) {
     savedAt,
     inventory: snapshot.inventory,
     sceneSnapshot: snapshot.sceneSnapshot,
+    farmSnapshot: snapshot.farmSnapshot,
   };
   window.localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
   LEGACY_SAVE_KEYS.forEach((key) => window.localStorage.removeItem(key));
@@ -309,7 +388,7 @@ async function saveGameState() {
 }
 
 async function resetLocalSave() {
-  const confirmed = window.confirm("重置本地存档？购买记录、金币和家具摆放会恢复默认。");
+  const confirmed = window.confirm("重置本地存档？购买记录、金币、家具摆放和农田状态会恢复默认。");
   if (!confirmed) return;
   try {
     const result = await bridgeRequest("save.reset");
@@ -1155,13 +1234,219 @@ function setPreview(zone) {
   }, 3200);
 }
 
-function handleYardAction(zone) {
+function farmStateLabel(stateId) {
+  return gameData.farm?.states?.[stateId]?.label || stateId || "未知状态";
+}
+
+function farmActionLabel(actionId) {
+  return FARM_ACTION_LABELS[actionId] || actionId;
+}
+
+function isBridgeOfflineError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    message.includes("disabled") ||
+    message.includes("connection") ||
+    message.includes("timeout") ||
+    message.includes("closed before response")
+  );
+}
+
+function pickFarmCropId() {
+  const crops = Object.entries(gameData.farm?.crops || {});
+  if (!crops.length) return null;
+  crops.sort(([, left], [, right]) => {
+    const leftMinutes = Number(left?.growMinutes);
+    const rightMinutes = Number(right?.growMinutes);
+    if (!Number.isFinite(leftMinutes) && !Number.isFinite(rightMinutes)) return 0;
+    if (!Number.isFinite(leftMinutes)) return 1;
+    if (!Number.isFinite(rightMinutes)) return -1;
+    return leftMinutes - rightMinutes;
+  });
+  return crops[0][0];
+}
+
+function chooseFarmOwnerAction(plotState) {
+  if (!plotState) return null;
+  const ownerActions = gameData.farm?.states?.[plotState]?.ownerActions || [];
+  const preferredByState = {
+    empty: "plant",
+    seeded: "water",
+    growing: "water",
+    ready: "harvest",
+    withered: "clear",
+  };
+  const preferred = preferredByState[plotState];
+  if (preferred && ownerActions.includes(preferred)) return preferred;
+  return ownerActions[0] || null;
+}
+
+function remainingGrowMinutes(plot, nowMs = Date.now()) {
+  if (!plot?.cropId || !plot?.plantedAt) return null;
+  const crop = gameData.farm?.crops?.[plot.cropId];
+  const growMinutes = Number(crop?.growMinutes);
+  const plantedAtMs = Date.parse(plot.plantedAt);
+  if (!Number.isFinite(growMinutes) || !Number.isFinite(plantedAtMs)) return null;
+  const readyAtMs = plantedAtMs + growMinutes * 60 * 1000;
+  if (nowMs >= readyAtMs) return 0;
+  return Math.ceil((readyAtMs - nowMs) / (60 * 1000));
+}
+
+function resolveFarmLifecycle(plot, nowMs = Date.now()) {
+  if (!plot || typeof plot !== "object") return false;
+  const crop = plot.cropId ? gameData.farm?.crops?.[plot.cropId] : null;
+  const growMinutes = Number(crop?.growMinutes);
+  const readyWindowMinutes = Number(crop?.readyWindowMinutes);
+  const plantedAtMs = Date.parse(plot.plantedAt || "");
+  if (!Number.isFinite(growMinutes) || !Number.isFinite(plantedAtMs)) return false;
+
+  const readyAtMs = plantedAtMs + growMinutes * 60 * 1000;
+  const witherAtMs = readyAtMs + readyWindowMinutes * 60 * 1000;
+  const nowIso = new Date(nowMs).toISOString();
+  let changed = false;
+
+  if ((plot.state === "seeded" || plot.state === "growing") && nowMs >= readyAtMs) {
+    plot.state = "ready";
+    plot.updatedAt = nowIso;
+    changed = true;
+  }
+
+  if (plot.state === "ready" && Number.isFinite(readyWindowMinutes) && nowMs >= witherAtMs) {
+    plot.state = "withered";
+    plot.updatedAt = nowIso;
+    changed = true;
+  }
+
+  return changed;
+}
+
+function applyFarmActionLocal(plotId, actionId, params = {}) {
+  const action = gameData.farm?.actions?.[actionId];
+  const plot = bridgeState.farmSnapshot?.plots?.[plotId];
+  if (!action || !plot) return null;
+  if (!action.from?.includes(plot.state)) return null;
+
+  const nowIso = new Date().toISOString();
+  if (action.requires?.includes("cropId")) {
+    if (!params.cropId) return null;
+    plot.cropId = params.cropId;
+    if (!plot.plantedAt) {
+      plot.plantedAt = nowIso;
+    }
+  }
+
+  plot.state = action.to || plot.state;
+  plot.updatedAt = nowIso;
+  if (actionId === "harvest" || actionId === "clear") {
+    const farmDefault = gameData.farm?.defaultPlotSnapshot || {};
+    plot.cropId = null;
+    plot.plantedAt = farmDefault.plantedAt ?? null;
+    plot.lastWateredAt = farmDefault.lastWateredAt ?? null;
+    plot.neighborHelps = cloneData(farmDefault.neighborHelps || []);
+    plot.stolenBy = cloneData(farmDefault.stolenBy || []);
+  } else if (actionId === "water") {
+    plot.lastWateredAt = nowIso;
+  }
+
+  return {
+    plot: normalizeFarmPlot(plot),
+    savedAt: nowIso,
+  };
+}
+
+async function handleYardAction(zone) {
   clearTimeout(state.previewTimer);
   state.preview = null;
   activeAgent().realStatus = zone.real;
   moveAgentTo(zoneInteractionPoint(zone), zone.real);
-  setBubble(zone.bubble, 2600);
-  toast(`${zone.label}是院子页面交互，不会触发工作任务`);
+  setBubble(zone.bubble, 3000);
+
+  const plotId = zone.farmPlotId;
+  if (!plotId) {
+    toast(`${zone.label}是院子页面交互，不会触发工作任务`);
+    return;
+  }
+
+  ensureFarmSnapshotShape();
+  const plot = bridgeState.farmSnapshot?.plots?.[plotId];
+  if (!plot) {
+    toast(`${zone.label}缺少农田状态，先按普通院子交互处理`);
+    return;
+  }
+
+  const lifecycleChanged = resolveFarmLifecycle(plot);
+  if (lifecycleChanged) {
+    setBubble(`${zone.label}：${farmStateLabel(plot.state)}`, 2800);
+    toast(`${zone.label} 状态更新为 ${farmStateLabel(plot.state)}`);
+    renderStatus();
+    return;
+  }
+
+  const actionId = chooseFarmOwnerAction(plot.state);
+  if (!actionId) {
+    toast(`${zone.label} 当前状态无可执行主人动作`);
+    return;
+  }
+
+  const params = {
+    plotId,
+    action: actionId,
+  };
+  if (actionId === "plant") {
+    const cropId = pickFarmCropId();
+    if (!cropId) {
+      toast("缺少可用作物配置，暂时无法播种");
+      return;
+    }
+    params.cropId = cropId;
+  }
+
+  const fromState = plot.state;
+  const actionText = farmActionLabel(actionId);
+  try {
+    const result = await bridgeRequest("farm.action", params);
+    const nextPlot = normalizeFarmPlot(result?.state || plot);
+    bridgeState.farmSnapshot.plots[plotId] = nextPlot;
+    ensureFarmSnapshotShape(result?.savedAt || new Date().toISOString());
+    writeLocalMirror(buildFullSnapshot(result?.savedAt || new Date().toISOString()), result?.savedAt || new Date().toISOString());
+    updateSaveDebug({
+      key: BRIDGE_SAVE_KEY,
+      status: "saved",
+      savedAt: result?.savedAt || new Date().toISOString(),
+      error: null,
+    });
+    const toState = bridgeState.farmSnapshot.plots[plotId].state;
+    const remain = toState === "growing" ? remainingGrowMinutes(bridgeState.farmSnapshot.plots[plotId]) : null;
+    const growHint = remain > 0 ? `，约 ${remain} 分钟后成熟` : "";
+    setBubble(`${zone.label}：${farmStateLabel(toState)}`, 3000);
+    toast(`${zone.label} ${actionText}：${farmStateLabel(fromState)} -> ${farmStateLabel(toState)}${growHint}`);
+    renderStatus();
+  } catch (error) {
+    if (!isBridgeOfflineError(error)) {
+      toast(`${zone.label} ${actionText}失败：${error.message}`);
+      return;
+    }
+    const fallback = applyFarmActionLocal(plotId, actionId, params);
+    if (!fallback) {
+      toast(`${zone.label} 当前无法执行 ${actionText}（bridge offline）`);
+      return;
+    }
+    bridgeState.farmSnapshot.plots[plotId] = fallback.plot;
+    ensureFarmSnapshotShape(fallback.savedAt);
+    writeLocalMirror(buildFullSnapshot(fallback.savedAt), fallback.savedAt);
+    updateSaveDebug({
+      key: SAVE_KEY,
+      status: "saved",
+      savedAt: fallback.savedAt,
+      error: `bridge offline: ${error.message}`,
+    });
+    const toState = fallback.plot.state;
+    const remain = toState === "growing" ? remainingGrowMinutes(fallback.plot) : null;
+    const growHint = remain > 0 ? `，约 ${remain} 分钟后成熟` : "";
+    setBubble(`${zone.label}：${farmStateLabel(toState)}`, 3000);
+    toast(`${zone.label} ${actionText}（离线）：${farmStateLabel(fromState)} -> ${farmStateLabel(toState)}${growHint}`);
+    renderStatus();
+  }
 }
 
 function navigateViaZone(zone) {
@@ -1566,7 +1851,7 @@ canvas.addEventListener("click", (event) => {
     return;
   }
   if (zone.type === "yard") {
-    handleYardAction(zone);
+    void handleYardAction(zone);
     return;
   }
   setPreview(zone);
