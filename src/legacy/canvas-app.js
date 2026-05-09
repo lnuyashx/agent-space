@@ -27,6 +27,26 @@ const FARM_ACTION_LABELS = {
   harvest: "收获",
   clear: "清理",
 };
+const THEME_TOKEN_COLORS = {
+  "warm-plaster": "#f4dec6",
+  "honey-oak": "#d7b083",
+  walnut: "#7d5840",
+  "soft-salmon": "#e6b79f",
+  "sunlit-soft": "#f3e0b9",
+  "leaf-green": "#8cab76",
+  "mist-blue": "#cadcec",
+  "pale-ash": "#d9d9d2",
+  "white-oak": "#d7c8af",
+  "cool-cream": "#ece6d8",
+  "clear-morning": "#d7e9f4",
+  "sea-glass": "#8ec6b8",
+  "warm-white": "#f4f0e7",
+  "matte-maple": "#ceb28b",
+  "charcoal-line": "#4e5057",
+  "rose-grid": "#dca8ab",
+  "studio-bright": "#f6e7c7",
+  "creator-pink": "#d48ca8",
+};
 const savedState = readSavedState();
 
 const sceneImages = Object.fromEntries(
@@ -83,6 +103,7 @@ Object.values(scenes).forEach((scene) => {
     zone.defaultItemId = zone.defaultItemId || zone.itemId;
   });
 });
+applyDefaultSceneThemes();
 applySavedSceneSnapshot(savedState.sceneSnapshot);
 applySavedFarmSnapshot(savedState.farmSnapshot);
 ensureFarmSnapshotShape();
@@ -164,6 +185,8 @@ const el = {
   decorateSlotList: document.querySelector("#decorateSlotList"),
   decorateItemList: document.querySelector("#decorateItemList"),
   decorateCurrentSlot: document.querySelector("#decorateCurrentSlot"),
+  themeCurrentLabel: document.querySelector("#themeCurrentLabel"),
+  themeList: document.querySelector("#themeList"),
   saveSchemaLabel: document.querySelector("#saveSchemaLabel"),
   saveDebugMeta: document.querySelector("#saveDebugMeta"),
   resetSaveBtn: document.querySelector("#resetSaveBtn"),
@@ -225,15 +248,85 @@ function applySavedSceneSnapshot(sceneSnapshot) {
   if (!sceneSnapshot) return;
   Object.entries(sceneSnapshot).forEach(([sceneId, sceneSave]) => {
     const scene = scenes[sceneId];
-    if (!scene || !sceneSave?.placedObjects) return;
-    Object.entries(sceneSave.placedObjects).forEach(([objectId, objectSave]) => {
-      const zone = scene.zones[objectId];
-      const item = gameData.itemCatalog[objectSave?.itemId];
-      if (!zone || !item || !item.slots?.includes(zone.slot)) return;
-      zone.itemId = objectSave.itemId;
-      zone.label = item.label;
-    });
+    if (!scene || !sceneSave) return;
+    if (sceneSave.placedObjects && typeof sceneSave.placedObjects === "object") {
+      Object.entries(sceneSave.placedObjects).forEach(([objectId, objectSave]) => {
+        const zone = scene.zones[objectId];
+        const item = gameData.itemCatalog[objectSave?.itemId];
+        if (!zone || !item || !item.slots?.includes(zone.slot)) return;
+        zone.itemId = objectSave.itemId;
+        zone.label = item.label;
+      });
+    }
+    if (Array.isArray(sceneSave.ownedThemeIds)) {
+      const validOwned = sceneSave.ownedThemeIds.filter((themeId) => canUseThemeInScene(themeId, sceneId));
+      if (validOwned.length) {
+        scene.ownedThemeIds = Array.from(new Set(validOwned));
+      }
+    }
+    if (typeof sceneSave.themeId === "string" && canUseThemeInScene(sceneSave.themeId, sceneId)) {
+      scene.themeId = sceneSave.themeId;
+    }
+    if (!Array.isArray(scene.ownedThemeIds) || !scene.ownedThemeIds.length) {
+      scene.ownedThemeIds = [defaultThemeIdForScene(sceneId)].filter(Boolean);
+    }
+    if (scene.themeId && !scene.ownedThemeIds.includes(scene.themeId)) {
+      scene.ownedThemeIds.push(scene.themeId);
+    }
   });
+}
+
+function themesForScene(sceneId) {
+  return Object.values(gameData.themeBundles?.themes || {}).filter((theme) => theme.sceneId === sceneId);
+}
+
+function defaultThemeIdForScene(sceneId) {
+  const themes = themesForScene(sceneId);
+  if (!themes.length) return null;
+  return themes.find((theme) => theme.saleMode === "default")?.id || themes[0].id;
+}
+
+function applyDefaultSceneThemes() {
+  Object.entries(scenes).forEach(([sceneId, scene]) => {
+    const defaultThemeId = defaultThemeIdForScene(sceneId);
+    if (!scene.themeId) {
+      scene.themeId = defaultThemeId;
+    }
+    if (!Array.isArray(scene.ownedThemeIds) || !scene.ownedThemeIds.length) {
+      scene.ownedThemeIds = [defaultThemeId].filter(Boolean);
+    }
+    if (scene.themeId && !scene.ownedThemeIds.includes(scene.themeId)) {
+      scene.ownedThemeIds.push(scene.themeId);
+    }
+  });
+}
+
+function canUseThemeInScene(themeId, sceneId) {
+  const theme = gameData.themeBundles?.themes?.[themeId];
+  return Boolean(theme && theme.sceneId === sceneId);
+}
+
+function sceneTheme(scene = activeScene()) {
+  const themeId = scene?.themeId;
+  if (!themeId) return null;
+  return gameData.themeBundles?.themes?.[themeId] || null;
+}
+
+function themeTokenColor(token, fallback) {
+  if (!token) return fallback;
+  return THEME_TOKEN_COLORS[token] || fallback;
+}
+
+function rgbaFromHex(hexColor, alpha) {
+  if (typeof hexColor !== "string" || !hexColor.startsWith("#")) {
+    return `rgba(255, 255, 255, ${alpha})`;
+  }
+  const value = hexColor.slice(1);
+  if (value.length !== 6) return `rgba(255, 255, 255, ${alpha})`;
+  const red = parseInt(value.slice(0, 2), 16);
+  const green = parseInt(value.slice(2, 4), 16);
+  const blue = parseInt(value.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 function applyBridgeSnapshot(snapshot) {
@@ -318,6 +411,8 @@ function buildSceneSnapshot() {
     Object.entries(scenes).map(([sceneId, scene]) => [
       sceneId,
       {
+        themeId: scene.themeId || defaultThemeIdForScene(sceneId),
+        ownedThemeIds: Array.isArray(scene.ownedThemeIds) ? Array.from(new Set(scene.ownedThemeIds)) : [],
         placedObjects: Object.fromEntries(
           Object.entries(scene.zones).map(([objectId, zone]) => [objectId, { itemId: zone.itemId }]),
         ),
@@ -766,8 +861,44 @@ function drawRoom() {
   }
   const rect = rectForCover(image);
   ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height);
+  if (state.currentScene !== "yard") {
+    const theme = sceneTheme();
+    if (theme) {
+      drawThemeOverlay(theme, rect);
+      return;
+    }
+  }
   ctx.fillStyle = state.currentScene === "yard" ? "rgba(255, 250, 205, 0.03)" : "rgba(255, 236, 203, 0.035)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawThemeOverlay(theme, rect) {
+  const tokens = theme?.styleTokens || {};
+  const wall = themeTokenColor(tokens.wall, "#f4ddc3");
+  const floor = themeTokenColor(tokens.floor, "#d6b18a");
+  const accent = themeTokenColor(tokens.accent, "#8cab76");
+  const lighting = themeTokenColor(tokens.lighting, "#f2dfb9");
+  const rug = themeTokenColor(tokens.rug, "#d7b39e");
+
+  ctx.fillStyle = rgbaFromHex(wall, 0.12);
+  ctx.fillRect(rect.x, rect.y, rect.width, rect.height * 0.58);
+
+  ctx.fillStyle = rgbaFromHex(floor, 0.11);
+  ctx.fillRect(rect.x, rect.y + rect.height * 0.58, rect.width, rect.height * 0.42);
+
+  ctx.fillStyle = rgbaFromHex(lighting, 0.08);
+  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+
+  const rugWidth = rect.width * 0.32;
+  const rugHeight = rect.height * 0.12;
+  const rugX = rect.x + rect.width * 0.33;
+  const rugY = rect.y + rect.height * 0.72;
+  ctx.fillStyle = rgbaFromHex(rug, 0.16);
+  ctx.fillRect(rugX, rugY, rugWidth, rugHeight);
+
+  ctx.strokeStyle = rgbaFromHex(accent, 0.42);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(rugX, rugY, rugWidth, rugHeight);
 }
 
 function drawObjectLayer() {
@@ -1166,6 +1297,85 @@ function toast(text) {
   window.setTimeout(() => item.remove(), 2400);
 }
 
+function sceneOwnsTheme(scene, themeId) {
+  return Array.isArray(scene?.ownedThemeIds) && scene.ownedThemeIds.includes(themeId);
+}
+
+function themeSwatchMarkup(theme) {
+  const wall = themeTokenColor(theme?.styleTokens?.wall, "#d7b79a");
+  const accent = themeTokenColor(theme?.styleTokens?.accent, "#b88873");
+  return `<span class="theme-chip" style="background:linear-gradient(135deg, ${wall} 0 56%, ${accent} 56% 100%);"></span>`;
+}
+
+function themeCommerceText(theme, owned, equipped) {
+  if (equipped) return `${theme.rarity} · 已装备`;
+  if (owned) return `${theme.rarity} · 已拥有`;
+  const price = Number(theme.price || 0);
+  return price > 0 ? `${theme.rarity} · ${price} 金币` : `${theme.rarity} · 免费`;
+}
+
+async function equipSceneTheme(themeId) {
+  const scene = activeScene();
+  if (!scene || !canUseThemeInScene(themeId, state.currentScene)) return;
+  const theme = gameData.themeBundles?.themes?.[themeId];
+  if (!theme) return;
+  if (scene.themeId === themeId) {
+    toast(`${theme.label} 已经是当前主题`);
+    return;
+  }
+
+  const wasOwned = sceneOwnsTheme(scene, themeId);
+  const price = Number(theme.price || 0);
+  if (!wasOwned && price > 0) {
+    if (gameData.inventory.coins < price) {
+      toast(`金币不足，还差 ${price - gameData.inventory.coins}`);
+      return;
+    }
+    gameData.inventory.coins = Math.max(0, gameData.inventory.coins - price);
+    scene.ownedThemeIds = Array.from(new Set([...(scene.ownedThemeIds || []), themeId]));
+  } else if (!wasOwned) {
+    scene.ownedThemeIds = Array.from(new Set([...(scene.ownedThemeIds || []), themeId]));
+  }
+
+  scene.themeId = themeId;
+  const bridgeSaved = await saveGameState();
+  renderDecoratePanel();
+  renderStatus();
+  if (!wasOwned && price > 0) {
+    toast(`已购买并切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
+  } else {
+    toast(`已切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
+  }
+}
+
+function renderThemeList() {
+  if (!el.themeList || !el.themeCurrentLabel) return;
+  const themes = themesForScene(state.currentScene);
+  const scene = activeScene();
+  const currentTheme = sceneTheme(scene);
+  el.themeList.innerHTML = "";
+
+  if (!themes.length) {
+    el.themeCurrentLabel.textContent = "房间主题";
+    el.themeList.innerHTML = '<div class="decor-card"><strong>当前场景暂无主题</strong><span>后续开放</span></div>';
+    return;
+  }
+
+  el.themeCurrentLabel.textContent = currentTheme ? `房间主题 · ${currentTheme.label}` : "房间主题";
+  themes.forEach((theme) => {
+    const owned = sceneOwnsTheme(scene, theme.id);
+    const equipped = scene.themeId === theme.id;
+    const button = document.createElement("button");
+    button.className = `theme-card${equipped ? " active" : ""}`;
+    button.type = "button";
+    button.innerHTML = `${themeSwatchMarkup(theme)}<span class="decor-copy"><strong>${theme.label}</strong><span>${themeCommerceText(theme, owned, equipped)}</span></span>`;
+    button.addEventListener("click", () => {
+      void equipSceneTheme(theme.id);
+    });
+    el.themeList.append(button);
+  });
+}
+
 function renderDecoratePanel() {
   if (!el.decorateDrawer) return;
   const slots = decoratableObjects();
@@ -1174,6 +1384,7 @@ function renderDecoratePanel() {
     el.decorateSlotList.innerHTML = '<div class="decor-card"><strong>当前场景暂无可替换槽位</strong><span>先回到室内试试</span></div>';
     el.decorateItemList.innerHTML = "";
     el.decorateCurrentSlot.textContent = "无可用槽位";
+    renderThemeList();
     return;
   }
   if (!state.selectedDecorObjectId || !activeScene().zones[state.selectedDecorObjectId]) {
@@ -1216,6 +1427,7 @@ function renderDecoratePanel() {
     });
     el.decorateItemList.append(button);
   });
+  renderThemeList();
 }
 
 function openDecoratePanel() {
