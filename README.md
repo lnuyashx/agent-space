@@ -112,15 +112,25 @@ http://127.0.0.1:5173/?renderer=pixi
 - `farm`：农田生命周期、作物目录、主人动作、邻居动作和地块快照形状；详见 `docs/farm-plot-state-model.zh-CN.md`
 - `themeBundles`：房间主题、家具包、所有权状态和装备流程；详见 `docs/room-theme-bundle-model.zh-CN.md`
 
-当前 demo 用 `localStorage` 存这些数据，正式版再替换成 Local Bridge / SQLite / Hub 同步。
+当前 demo 用 `localStorage` 存这些数据。仓库里已新增 Local Bridge v0.1（WebSocket + SQLite）基座，后续会把前端写路径从 `localStorage` 迁到 Bridge。
 当前浏览器加载顺序是数据切片先挂到 `window.AGENT_SPACE_DATA_MODULES`，再由 `data/game-data.js` 组合为旧入口，保证 `app.js` 和旧测试不需要理解每个切片文件。
 当前存档 payload 写入 `schemaVersion: 2` 和 `savedAt`，仍兼容读取旧的 `agent-space-demo-save-v1`。
 
+## Local Bridge（实验）
+
+```sh
+npm run bridge:start
+```
+
+- WebSocket: `ws://127.0.0.1:8787/bridge`
+- Health: `http://127.0.0.1:8787/healthz`
+- 协议文档：`docs/asp-v0.1.zh-CN.md`（英文：`docs/asp-v0.1.en.md`）
+- SQLite 默认路径：`bridge/.runtime/agent-space-bridge.sqlite`
+
 ## 暂缓范围
 
-- Local Bridge 真实 WebSocket 服务
+- 前端与 Local Bridge 的正式联调迁移
 - Claude Code / OpenClaw 真实适配器
-- SQLite 本地持久化
 - Hub 联机广播
 - 真实商城和支付
 - 桌宠客户端

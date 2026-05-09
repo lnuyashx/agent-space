@@ -153,6 +153,15 @@ The client writes a small save object to browser `localStorage`:
 
 That is only a local prototype stand-in. The production path should store the same shape through Local Bridge / SQLite first, then sync selected scene snapshots through Hub for social visits.
 
+The repository now includes a Local Bridge v0.1 backend bootstrap under `bridge/`:
+
+- transport: WebSocket (`/bridge`)
+- persistence: SQLite (`bridge/.runtime/agent-space-bridge.sqlite`)
+- protocol doc: `docs/asp-v0.1.zh-CN.md` and `docs/asp-v0.1.en.md`
+- minimum methods: `ping`, `snapshot.get`, `snapshot.save`, `inventory.buy`, `scene.equip`, `farm.action`, `save.reset`
+
+The current Web client is still allowed to use `localStorage` as fallback while the bridge adapter is integrated.
+
 ## Why Not Static Background Long Term
 
 Static backgrounds are good for proving mood and layout, but weak for:
