@@ -8,6 +8,7 @@ const SAVE_KEY = "agent-space-demo-save";
 const LEGACY_SAVE_KEYS = ["agent-space-demo-save-v1"];
 const BRIDGE_SAVE_KEY = "agent-space-local-bridge";
 const BRIDGE_TIMEOUT_MS = 2200;
+const FARM_LIFECYCLE_TICK_MS = 1500;
 const saveDebugState = {
   key: SAVE_KEY,
   schemaVersion: SAVE_SCHEMA_VERSION,
@@ -132,6 +133,9 @@ const state = {
   navigationTimer: null,
   decorating: false,
   selectedDecorObjectId: null,
+  selectedFarmPlotId: null,
+  lastFarmLifecycleTickAt: 0,
+  farmLifecyclePersisting: false,
 };
 
 const el = {
@@ -692,6 +696,9 @@ function setScene(sceneName, options = {}) {
   if (!scenes[sceneName]) return;
   clearTimeout(state.navigationTimer);
   state.currentScene = sceneName;
+  if (sceneName !== "yard") {
+    state.selectedFarmPlotId = null;
+  }
   state.preview = null;
   state.hoverZone = null;
   state.hotspotPulse = null;
@@ -771,6 +778,64 @@ function drawObjectLayer() {
       time,
     });
   });
+}
+
+function drawFarmPlotMarkers() {
+  if (state.currentScene !== "yard") return;
+  const farmZones = Object.values(activeScene().zones).filter((zone) => zone.farmPlotId);
+  if (!farmZones.length) return;
+
+  farmZones.forEach((zone) => {
+    const summary = farmSummaryForZone(zone);
+    if (!summary) return;
+    const bounds = zoneBounds(zone);
+    const center = sceneToCanvas({ x: bounds.x + bounds.w / 2, y: bounds.y });
+    const primaryText = summary.cropLabel ? `${summary.stateLabel} · ${summary.cropLabel}` : summary.stateLabel;
+    const secondaryText = `可做 ${summary.actionHint}`;
+    const active = state.selectedFarmPlotId === summary.plotId || state.hotspotPulse?.zone === zone || state.hoverZone === zone;
+
+    ctx.save();
+    ctx.font = "11px ui-sans-serif";
+    const width = Math.min(182, Math.max(106, Math.max(ctx.measureText(primaryText).width, ctx.measureText(secondaryText).width) + 16));
+    const x = clamp(center.x - width / 2, 10, canvas.width - width - 10);
+    const y = clamp(center.y - 48, 12, canvas.height - 46);
+    ctx.fillStyle = active ? "rgba(255, 245, 223, .95)" : "rgba(255, 250, 241, .88)";
+    ctx.strokeStyle = active ? "rgba(215, 131, 76, .9)" : "rgba(90, 68, 49, .26)";
+    ctx.lineWidth = active ? 2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, 34, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#2b241c";
+    ctx.textAlign = "center";
+    ctx.fillText(primaryText, x + width / 2, y + 14);
+    ctx.fillStyle = "#5d4a3a";
+    ctx.fillText(secondaryText, x + width / 2, y + 28);
+    ctx.restore();
+  });
+}
+
+function tickFarmLifecycle(nowMs = Date.now()) {
+  if (state.currentScene !== "yard") return;
+  if (nowMs - state.lastFarmLifecycleTickAt < FARM_LIFECYCLE_TICK_MS) return;
+  state.lastFarmLifecycleTickAt = nowMs;
+  ensureFarmSnapshotShape(new Date(nowMs).toISOString());
+  const plots = bridgeState.farmSnapshot?.plots || {};
+  let changed = false;
+  Object.values(plots).forEach((plot) => {
+    if (resolveFarmLifecycle(plot, nowMs)) {
+      changed = true;
+    }
+  });
+  if (!changed) return;
+
+  if (!state.farmLifecyclePersisting) {
+    state.farmLifecyclePersisting = true;
+    void saveGameState().finally(() => {
+      state.farmLifecyclePersisting = false;
+    });
+  }
+  renderStatus();
 }
 
 function drawPixelFurniture(zone, item, options) {
@@ -929,9 +994,10 @@ function drawZonePreview() {
   ctx.shadowBlur = 0;
   ctx.fillStyle = "rgba(255, 250, 241, .94)";
   ctx.strokeStyle = "rgba(65, 42, 30, .2)";
-  const label = zone.label;
+  const farmSummary = zone.farmPlotId ? farmSummaryForZone(zone) : null;
+  const label = farmSummary ? `${zone.label} · ${farmSummary.stateLabel}` : zone.label;
   ctx.font = "12px ui-sans-serif";
-  const labelWidth = Math.min(120, Math.max(44, ctx.measureText(label).width + 18));
+  const labelWidth = Math.min(178, Math.max(44, ctx.measureText(label).width + 18));
   const labelX = clamp((p1.x + p2.x) / 2 - labelWidth / 2, 12, canvas.width - labelWidth - 12);
   const labelY = clamp(p1.y - 30, 18, canvas.height - 38);
   ctx.beginPath();
@@ -1071,11 +1137,13 @@ function drawArtifactMark(p, time) {
 function draw() {
   resizeCanvas();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  tickFarmLifecycle();
   drawRoom();
   updateAgentPosition();
   drawObjectLayer();
   drawClickTarget(performance.now());
   drawZonePreview();
+  drawFarmPlotMarkers();
   drawDecorationMarkers();
   drawAgent(performance.now());
   requestAnimationFrame(draw);
@@ -1242,6 +1310,36 @@ function farmActionLabel(actionId) {
   return FARM_ACTION_LABELS[actionId] || actionId;
 }
 
+function farmPlotForZone(zone) {
+  const plotId = zone?.farmPlotId;
+  if (!plotId) return null;
+  return bridgeState.farmSnapshot?.plots?.[plotId] || null;
+}
+
+function farmActionHints(plotState) {
+  const ownerActions = gameData.farm?.states?.[plotState]?.ownerActions || [];
+  if (!ownerActions.length) return "无可执行动作";
+  return ownerActions.map((actionId) => farmActionLabel(actionId)).join(" / ");
+}
+
+function farmSummaryForZone(zone) {
+  const plot = farmPlotForZone(zone);
+  if (!plot) return null;
+  return {
+    plotId: zone.farmPlotId,
+    stateId: plot.state,
+    stateLabel: farmStateLabel(plot.state),
+    cropLabel: plot.cropId ? gameData.farm?.crops?.[plot.cropId]?.label || plot.cropId : null,
+    actionHint: farmActionHints(plot.state),
+  };
+}
+
+function farmPreviewHint(summary) {
+  if (!summary) return "院子页面";
+  const crop = summary.cropLabel ? ` · ${summary.cropLabel}` : "";
+  return `农田 ${summary.stateLabel}${crop} · 可做 ${summary.actionHint}`;
+}
+
 function isBridgeOfflineError(error) {
   const message = String(error?.message || "").toLowerCase();
   return (
@@ -1363,9 +1461,12 @@ async function handleYardAction(zone) {
 
   const plotId = zone.farmPlotId;
   if (!plotId) {
+    state.selectedFarmPlotId = null;
     toast(`${zone.label}是院子页面交互，不会触发工作任务`);
+    renderStatus();
     return;
   }
+  state.selectedFarmPlotId = plotId;
 
   ensureFarmSnapshotShape();
   const plot = bridgeState.farmSnapshot?.plots?.[plotId];
@@ -1376,8 +1477,10 @@ async function handleYardAction(zone) {
 
   const lifecycleChanged = resolveFarmLifecycle(plot);
   if (lifecycleChanged) {
+    await saveGameState();
+    const summary = farmSummaryForZone(zone);
     setBubble(`${zone.label}：${farmStateLabel(plot.state)}`, 2800);
-    toast(`${zone.label} 状态更新为 ${farmStateLabel(plot.state)}`);
+    toast(`${zone.label} 状态更新为 ${farmStateLabel(plot.state)}，可做 ${summary?.actionHint || "无可执行动作"}`);
     renderStatus();
     return;
   }
@@ -1473,6 +1576,9 @@ function handleGroundClick(point) {
   }
   clearTimeout(state.previewTimer);
   state.preview = null;
+  if (state.currentScene === "yard") {
+    state.selectedFarmPlotId = null;
+  }
   const target = nearestWalkablePoint(point);
   const status = state.currentScene === "yard" ? "在院子里散步" : "在房间里走动";
   activeAgent().realStatus = status;
@@ -1629,7 +1735,13 @@ function renderStatus() {
             : "需要安慰";
   if (!state.preview) {
     el.currentTask.textContent = agent.realStatus;
-    el.previewHint.textContent = state.currentScene === "yard" ? "院子页面" : "真实状态";
+    if (state.currentScene === "yard") {
+      const selectedZone = Object.values(activeScene().zones).find((zone) => zone.farmPlotId === state.selectedFarmPlotId) || null;
+      const summary = selectedZone ? farmSummaryForZone(selectedZone) : null;
+      el.previewHint.textContent = farmPreviewHint(summary);
+    } else {
+      el.previewHint.textContent = "真实状态";
+    }
   }
   drawAvatar();
   renderSaveDebug();
