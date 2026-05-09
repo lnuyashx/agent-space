@@ -136,6 +136,7 @@ const state = {
   selectedFarmPlotId: null,
   lastFarmLifecycleTickAt: 0,
   farmLifecyclePersisting: false,
+  pendingFarmAction: false,
 };
 
 const el = {
@@ -166,6 +167,10 @@ const el = {
   saveSchemaLabel: document.querySelector("#saveSchemaLabel"),
   saveDebugMeta: document.querySelector("#saveDebugMeta"),
   resetSaveBtn: document.querySelector("#resetSaveBtn"),
+  farmActionPanel: document.querySelector("#farmActionPanel"),
+  farmPanelTitle: document.querySelector("#farmPanelTitle"),
+  farmPanelState: document.querySelector("#farmPanelState"),
+  farmActionButtons: document.querySelector("#farmActionButtons"),
 };
 
 function readSavedState() {
@@ -1340,6 +1345,50 @@ function farmPreviewHint(summary) {
   return `农田 ${summary.stateLabel}${crop} · 可做 ${summary.actionHint}`;
 }
 
+function selectedFarmZone() {
+  if (state.currentScene !== "yard" || !state.selectedFarmPlotId) return null;
+  return Object.values(activeScene().zones).find((zone) => zone.farmPlotId === state.selectedFarmPlotId) || null;
+}
+
+function renderFarmActionPanel() {
+  if (!el.farmActionPanel || !el.farmPanelTitle || !el.farmPanelState || !el.farmActionButtons) return;
+  const zone = selectedFarmZone();
+  const summary = zone ? farmSummaryForZone(zone) : null;
+  if (!zone || !summary) {
+    el.farmActionPanel.setAttribute("aria-hidden", "true");
+    el.farmPanelTitle.textContent = "农田动作";
+    el.farmPanelState.textContent = "请选择一个农田地块";
+    el.farmActionButtons.innerHTML = "";
+    return;
+  }
+
+  const ownerActions = gameData.farm?.states?.[summary.stateId]?.ownerActions || [];
+  const cropCopy = summary.cropLabel ? ` · 作物 ${summary.cropLabel}` : " · 作物 无";
+  el.farmActionPanel.setAttribute("aria-hidden", "false");
+  el.farmPanelTitle.textContent = `${zone.label} · ${summary.stateLabel}`;
+  el.farmPanelState.textContent = `可做 ${summary.actionHint}${cropCopy}`;
+  el.farmActionButtons.innerHTML = "";
+
+  if (!ownerActions.length) {
+    const empty = document.createElement("span");
+    empty.className = "farm-action-empty";
+    empty.textContent = "当前状态没有可执行动作";
+    el.farmActionButtons.append(empty);
+    return;
+  }
+
+  ownerActions.forEach((actionId) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.farmAction = actionId;
+    button.textContent = farmActionLabel(actionId);
+    if (state.pendingFarmAction || (actionId === "plant" && !pickFarmCropId())) {
+      button.disabled = true;
+    }
+    el.farmActionButtons.append(button);
+  });
+}
+
 function isBridgeOfflineError(error) {
   const message = String(error?.message || "").toLowerCase();
   return (
@@ -1452,49 +1501,29 @@ function applyFarmActionLocal(plotId, actionId, params = {}) {
   };
 }
 
-async function handleYardAction(zone) {
-  clearTimeout(state.previewTimer);
-  state.preview = null;
-  activeAgent().realStatus = zone.real;
-  moveAgentTo(zoneInteractionPoint(zone), zone.real);
-  setBubble(zone.bubble, 3000);
-
-  const plotId = zone.farmPlotId;
-  if (!plotId) {
-    state.selectedFarmPlotId = null;
-    toast(`${zone.label}是院子页面交互，不会触发工作任务`);
-    renderStatus();
-    return;
-  }
-  state.selectedFarmPlotId = plotId;
-
+async function executeFarmOwnerAction(zone, actionId) {
+  if (state.pendingFarmAction) return;
+  const plotId = zone?.farmPlotId;
+  if (!plotId || !actionId) return;
   ensureFarmSnapshotShape();
   const plot = bridgeState.farmSnapshot?.plots?.[plotId];
   if (!plot) {
-    toast(`${zone.label}缺少农田状态，先按普通院子交互处理`);
+    toast(`${zone.label}缺少农田状态，暂时无法执行动作`);
     return;
   }
 
   const lifecycleChanged = resolveFarmLifecycle(plot);
   if (lifecycleChanged) {
     await saveGameState();
-    const summary = farmSummaryForZone(zone);
-    setBubble(`${zone.label}：${farmStateLabel(plot.state)}`, 2800);
-    toast(`${zone.label} 状态更新为 ${farmStateLabel(plot.state)}，可做 ${summary?.actionHint || "无可执行动作"}`);
+  }
+  const ownerActions = gameData.farm?.states?.[plot.state]?.ownerActions || [];
+  if (!ownerActions.includes(actionId)) {
+    toast(`${zone.label} 当前状态只支持：${farmActionHints(plot.state)}`);
     renderStatus();
     return;
   }
 
-  const actionId = chooseFarmOwnerAction(plot.state);
-  if (!actionId) {
-    toast(`${zone.label} 当前状态无可执行主人动作`);
-    return;
-  }
-
-  const params = {
-    plotId,
-    action: actionId,
-  };
+  const params = { plotId, action: actionId };
   if (actionId === "plant") {
     const cropId = pickFarmCropId();
     if (!cropId) {
@@ -1504,18 +1533,21 @@ async function handleYardAction(zone) {
     params.cropId = cropId;
   }
 
+  state.pendingFarmAction = true;
+  renderFarmActionPanel();
   const fromState = plot.state;
   const actionText = farmActionLabel(actionId);
   try {
     const result = await bridgeRequest("farm.action", params);
     const nextPlot = normalizeFarmPlot(result?.state || plot);
     bridgeState.farmSnapshot.plots[plotId] = nextPlot;
-    ensureFarmSnapshotShape(result?.savedAt || new Date().toISOString());
-    writeLocalMirror(buildFullSnapshot(result?.savedAt || new Date().toISOString()), result?.savedAt || new Date().toISOString());
+    const savedAt = result?.savedAt || new Date().toISOString();
+    ensureFarmSnapshotShape(savedAt);
+    writeLocalMirror(buildFullSnapshot(savedAt), savedAt);
     updateSaveDebug({
       key: BRIDGE_SAVE_KEY,
       status: "saved",
-      savedAt: result?.savedAt || new Date().toISOString(),
+      savedAt,
       error: null,
     });
     const toState = bridgeState.farmSnapshot.plots[plotId].state;
@@ -1523,7 +1555,6 @@ async function handleYardAction(zone) {
     const growHint = remain > 0 ? `，约 ${remain} 分钟后成熟` : "";
     setBubble(`${zone.label}：${farmStateLabel(toState)}`, 3000);
     toast(`${zone.label} ${actionText}：${farmStateLabel(fromState)} -> ${farmStateLabel(toState)}${growHint}`);
-    renderStatus();
   } catch (error) {
     if (!isBridgeOfflineError(error)) {
       toast(`${zone.label} ${actionText}失败：${error.message}`);
@@ -1548,8 +1579,44 @@ async function handleYardAction(zone) {
     const growHint = remain > 0 ? `，约 ${remain} 分钟后成熟` : "";
     setBubble(`${zone.label}：${farmStateLabel(toState)}`, 3000);
     toast(`${zone.label} ${actionText}（离线）：${farmStateLabel(fromState)} -> ${farmStateLabel(toState)}${growHint}`);
+  } finally {
+    state.pendingFarmAction = false;
     renderStatus();
   }
+}
+
+async function handleYardAction(zone) {
+  clearTimeout(state.previewTimer);
+  state.preview = null;
+  activeAgent().realStatus = zone.real;
+  moveAgentTo(zoneInteractionPoint(zone), zone.real);
+  setBubble(zone.bubble, 3000);
+
+  const plotId = zone.farmPlotId;
+  if (!plotId) {
+    state.selectedFarmPlotId = null;
+    toast(`${zone.label}是院子页面交互，不会触发工作任务`);
+    renderStatus();
+    return;
+  }
+
+  state.selectedFarmPlotId = plotId;
+  ensureFarmSnapshotShape();
+  const plot = bridgeState.farmSnapshot?.plots?.[plotId];
+  if (!plot) {
+    toast(`${zone.label}缺少农田状态，先按普通院子交互处理`);
+    renderStatus();
+    return;
+  }
+
+  const lifecycleChanged = resolveFarmLifecycle(plot);
+  if (lifecycleChanged) {
+    await saveGameState();
+  }
+  const summary = farmSummaryForZone(zone);
+  setBubble(`${zone.label}：${farmStateLabel(plot.state)}`, 3000);
+  toast(`${zone.label} 当前 ${summary?.stateLabel || "未知"}，可做 ${summary?.actionHint || "无可执行动作"}`);
+  renderStatus();
 }
 
 function navigateViaZone(zone) {
@@ -1736,7 +1803,7 @@ function renderStatus() {
   if (!state.preview) {
     el.currentTask.textContent = agent.realStatus;
     if (state.currentScene === "yard") {
-      const selectedZone = Object.values(activeScene().zones).find((zone) => zone.farmPlotId === state.selectedFarmPlotId) || null;
+      const selectedZone = selectedFarmZone();
       const summary = selectedZone ? farmSummaryForZone(selectedZone) : null;
       el.previewHint.textContent = farmPreviewHint(summary);
     } else {
@@ -1745,6 +1812,7 @@ function renderStatus() {
   }
   drawAvatar();
   renderSaveDebug();
+  renderFarmActionPanel();
 }
 
 function resolveBridgeUrl() {
@@ -1996,6 +2064,17 @@ document.querySelector("#closeArtifactBtn").addEventListener("click", () => {
 document.querySelector("#closeDecorateBtn").addEventListener("click", closeDecoratePanel);
 el.resetSaveBtn.addEventListener("click", () => {
   void resetLocalSave();
+});
+el.farmActionButtons?.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-farm-action]");
+  if (!button) return;
+  const zone = selectedFarmZone();
+  if (!zone) return;
+  if (state.working) {
+    setBubble("我先把手上的任务做完");
+    return;
+  }
+  void executeFarmOwnerAction(zone, button.dataset.farmAction);
 });
 
 document.querySelector("#copyArtifactBtn").addEventListener("click", async () => {
