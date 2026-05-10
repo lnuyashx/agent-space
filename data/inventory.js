@@ -17,5 +17,5 @@ window.AGENT_SPACE_DATA_MODULES.inventory = {
     "farm_plot_basic": 2,
     "mailbox_basic": 1
   },
-  "coins": 50
+  "coins": 999999
 };

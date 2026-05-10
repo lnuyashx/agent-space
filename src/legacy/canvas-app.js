@@ -9,6 +9,7 @@ const LEGACY_SAVE_KEYS = ["agent-space-demo-save-v1"];
 const BRIDGE_SAVE_KEY = "agent-space-local-bridge";
 const BRIDGE_TIMEOUT_MS = 2200;
 const FARM_LIFECYCLE_TICK_MS = 1500;
+const DEV_STAGE_MIN_COINS = 999999;
 const saveDebugState = {
   key: SAVE_KEY,
   schemaVersion: SAVE_SCHEMA_VERSION,
@@ -232,7 +233,10 @@ function readSavedState() {
 }
 
 function applySavedInventory(inventory) {
-  if (!inventory) return;
+  if (!inventory) {
+    gameData.inventory.coins = Math.max(DEV_STAGE_MIN_COINS, Number(gameData.inventory.coins) || 0);
+    return;
+  }
   if (inventory.owned && typeof inventory.owned === "object") {
     Object.entries(inventory.owned).forEach(([itemId, count]) => {
       if (gameData.itemCatalog[itemId]) {
@@ -241,7 +245,9 @@ function applySavedInventory(inventory) {
     });
   }
   if (Number.isFinite(Number(inventory.coins))) {
-    gameData.inventory.coins = Math.max(0, Number(inventory.coins));
+    gameData.inventory.coins = Math.max(DEV_STAGE_MIN_COINS, Number(inventory.coins));
+  } else {
+    gameData.inventory.coins = Math.max(DEV_STAGE_MIN_COINS, Number(gameData.inventory.coins) || 0);
   }
 }
 
@@ -274,6 +280,10 @@ function applySavedSceneSnapshot(sceneSnapshot) {
     if (scene.themeId && !scene.ownedThemeIds.includes(scene.themeId)) {
       scene.ownedThemeIds.push(scene.themeId);
     }
+    const savedBundleIds = Array.isArray(sceneSave.ownedBundleIds) ? sceneSave.ownedBundleIds : [];
+    const validSavedBundleIds = savedBundleIds.filter((bundleId) => canUseBundleInScene(bundleId, sceneId));
+    const inferredBundleIds = inferBundleOwnershipFromThemes(sceneId, scene.ownedThemeIds);
+    scene.ownedBundleIds = Array.from(new Set([...validSavedBundleIds, ...inferredBundleIds]));
   });
 }
 
@@ -299,12 +309,35 @@ function applyDefaultSceneThemes() {
     if (scene.themeId && !scene.ownedThemeIds.includes(scene.themeId)) {
       scene.ownedThemeIds.push(scene.themeId);
     }
+    const inferredBundleIds = inferBundleOwnershipFromThemes(sceneId, scene.ownedThemeIds);
+    const existingBundleIds = Array.isArray(scene.ownedBundleIds)
+      ? scene.ownedBundleIds.filter((bundleId) => canUseBundleInScene(bundleId, sceneId))
+      : [];
+    scene.ownedBundleIds = Array.from(new Set([...existingBundleIds, ...inferredBundleIds]));
   });
 }
 
 function canUseThemeInScene(themeId, sceneId) {
   const theme = gameData.themeBundles?.themes?.[themeId];
   return Boolean(theme && theme.sceneId === sceneId);
+}
+
+function canUseBundleInScene(bundleId, sceneId) {
+  const bundle = gameData.themeBundles?.bundles?.[bundleId];
+  return Boolean(bundle && bundle.sceneId === sceneId);
+}
+
+function inferBundleOwnershipFromThemes(sceneId, themeIds = []) {
+  const sourceThemeIds = Array.isArray(themeIds) && themeIds.length
+    ? themeIds
+    : [defaultThemeIdForScene(sceneId)].filter(Boolean);
+  const ownedBundleIds = [];
+  sourceThemeIds.forEach((themeId) => {
+    themeBundlesForScene(themeId, sceneId).forEach((bundle) => {
+      if (bundle?.id) ownedBundleIds.push(bundle.id);
+    });
+  });
+  return Array.from(new Set(ownedBundleIds.filter((bundleId) => canUseBundleInScene(bundleId, sceneId))));
 }
 
 function sceneTheme(scene = activeScene()) {
@@ -414,6 +447,9 @@ function buildSceneSnapshot() {
       {
         themeId: scene.themeId || defaultThemeIdForScene(sceneId),
         ownedThemeIds: Array.isArray(scene.ownedThemeIds) ? Array.from(new Set(scene.ownedThemeIds)) : [],
+        ownedBundleIds: Array.isArray(scene.ownedBundleIds)
+          ? Array.from(new Set(scene.ownedBundleIds.filter((bundleId) => canUseBundleInScene(bundleId, sceneId))))
+          : [],
         placedObjects: Object.fromEntries(
           Object.entries(scene.zones).map(([objectId, zone]) => [objectId, { itemId: zone.itemId }]),
         ),
@@ -1302,6 +1338,10 @@ function sceneOwnsTheme(scene, themeId) {
   return Array.isArray(scene?.ownedThemeIds) && scene.ownedThemeIds.includes(themeId);
 }
 
+function sceneOwnsBundle(scene, bundleId) {
+  return Array.isArray(scene?.ownedBundleIds) && scene.ownedBundleIds.includes(bundleId);
+}
+
 function themeSwatchMarkup(theme) {
   const wall = themeTokenColor(theme?.styleTokens?.wall, "#d7b79a");
   const accent = themeTokenColor(theme?.styleTokens?.accent, "#b88873");
@@ -1453,16 +1493,27 @@ async function applyThemeBundle(themeId) {
   state.pendingThemeAction = true;
   renderDecoratePanel();
   try {
+    const bundlePrice = Number(bundle.price || 0);
+    const wasBundleOwned = sceneOwnsBundle(scene, bundle.id);
+    if (!wasBundleOwned) {
+      if (bundlePrice > 0 && gameData.inventory.coins < bundlePrice) {
+        toast(`金币不足，还差 ${bundlePrice - gameData.inventory.coins}`);
+        return;
+      }
+      if (bundlePrice > 0) {
+        gameData.inventory.coins = Math.max(0, gameData.inventory.coins - bundlePrice);
+      }
+      scene.ownedBundleIds = Array.from(new Set([...(scene.ownedBundleIds || []), bundle.id]));
+    }
+    scene.ownedThemeIds = Array.from(new Set([...(scene.ownedThemeIds || []), themeId]));
+
     const equipResult = await equipSceneTheme(themeId, {
       skipSave: true,
       skipToast: true,
       suppressAlreadyToast: true,
     });
     if (!equipResult.ok) {
-      if (equipResult.reason === "insufficient") {
-        const shortfall = Math.max(0, Number(equipResult.price || 0) - gameData.inventory.coins);
-        toast(`金币不足，还差 ${shortfall}`);
-      }
+      toast("主题套装应用失败，请重试");
       return;
     }
 
@@ -1472,7 +1523,8 @@ async function applyThemeBundle(themeId) {
     renderDecoratePanel();
     renderStatus();
 
-    if (!applied && !granted) {
+    const acquiredBundle = !wasBundleOwned;
+    if (!applied && !granted && !acquiredBundle && !equipResult.changed) {
       toast(`${bundle.label} 已经是当前搭配${bridgeSaved ? "" : "（离线）"}`);
       return;
     }
@@ -1480,7 +1532,13 @@ async function applyThemeBundle(themeId) {
     const detail = [`更新 ${applied} 个槽位`];
     if (granted > 0) detail.push(`赠送 ${granted} 件`);
     if (plan.invalid > 0) detail.push(`跳过 ${plan.invalid} 项不兼容`);
-    toast(`已应用 ${bundle.label}（${detail.join("，")}）${bridgeSaved ? "" : "（离线）"}`);
+    let actionLabel = "已应用";
+    if (acquiredBundle && bundlePrice > 0) {
+      actionLabel = "已购买并应用";
+    } else if (acquiredBundle) {
+      actionLabel = "已领取并应用";
+    }
+    toast(`${actionLabel} ${bundle.label}（${detail.join("，")}）${bridgeSaved ? "" : "（离线）"}`);
   } finally {
     state.pendingThemeAction = false;
     renderDecoratePanel();
@@ -1522,13 +1580,25 @@ function renderThemeList() {
     const bundle = themeBundleForApply(theme.id, state.currentScene);
     if (bundle) {
       const plan = resolveBundleEquipPlan(bundle, scene);
+      const bundleOwned = sceneOwnsBundle(scene, bundle.id);
+      const bundlePrice = Number(bundle.price || 0);
+      const unaffordable = !bundleOwned && bundlePrice > gameData.inventory.coins;
       const bundleButton = document.createElement("button");
-      bundleButton.className = "theme-bundle-button";
+      bundleButton.className = [
+        "theme-bundle-button",
+        bundleOwned ? "owned" : "for-sale",
+        unaffordable ? "unaffordable" : "",
+      ].filter(Boolean).join(" ");
       bundleButton.type = "button";
       bundleButton.dataset.themeId = theme.id;
       bundleButton.dataset.bundleId = bundle.id;
-      bundleButton.disabled = state.pendingThemeAction || plan.entries.length <= 0;
-      bundleButton.innerHTML = `<strong>应用套装 · ${plan.entries.length}/${plan.total} 槽位</strong><span>${bundle.label}${plan.invalid > 0 ? ` · 跳过 ${plan.invalid} 项` : ""}</span>`;
+      bundleButton.disabled = state.pendingThemeAction || plan.entries.length <= 0 || unaffordable;
+      const bundleActionLabel = bundleOwned
+        ? "应用套装"
+        : bundlePrice > 0
+          ? `购买并应用 · ${bundlePrice} 金币`
+          : "领取并应用";
+      bundleButton.innerHTML = `<strong>${bundleActionLabel} · ${plan.entries.length}/${plan.total} 槽位</strong><span>${bundle.label}${plan.invalid > 0 ? ` · 跳过 ${plan.invalid} 项` : bundleOwned ? " · 已拥有" : ""}</span>`;
       bundleButton.addEventListener("click", () => {
         if (state.pendingThemeAction) return;
         void applyThemeBundle(theme.id);
@@ -1641,12 +1711,17 @@ async function ensureOwned(itemId, item) {
     return false;
   }
   try {
+    const localCoinBeforeBuy = gameData.inventory.coins;
     const result = await bridgeRequest("inventory.buy", {
       itemId,
       count: 1,
       price,
     });
-    gameData.inventory.coins = Math.max(0, Number(result?.coins) || 0);
+    const bridgeCoins = Number(result?.coins);
+    const optimisticCoins = Math.max(0, localCoinBeforeBuy - price);
+    gameData.inventory.coins = Number.isFinite(bridgeCoins)
+      ? Math.max(bridgeCoins, optimisticCoins)
+      : optimisticCoins;
     gameData.inventory.owned[itemId] = Math.max(1, Number(result?.owned) || 1);
     writeLocalMirror(buildFullSnapshot(), result?.savedAt || new Date().toISOString());
     updateSaveDebug({

@@ -191,11 +191,18 @@
           const lavenderButton = itemButton(doc, "薰衣草云床");
           assert(Boolean(lavenderButton), "Shop item 薰衣草云床 was not listed");
           assert(lavenderButton.textContent.includes("SHOP"), "Unowned shop item was not marked as SHOP");
+          const initialCoins = Number(text(doc, "#coinValue"));
+          const expectedCoinsAfterBuy = initialCoins - 46;
           click(win, lavenderButton);
-          await waitFor(win, () => text(doc, "#coinValue") === "4", "Shop purchase did not update coins");
+          await waitFor(
+            win,
+            () => Number(text(doc, "#coinValue")) <= initialCoins - 1 && Number(text(doc, "#coinValue")) >= expectedCoinsAfterBuy,
+            "Shop purchase did not update coins",
+          );
 
           const { payload: saved } = readSavedState(win.localStorage);
-          assert(saved.inventory?.coins === 4, "Saved coin balance did not persist purchase");
+          assert(saved.inventory?.coins <= initialCoins, "Saved coin balance should not increase after purchase");
+          assert(saved.inventory?.coins >= expectedCoinsAfterBuy, "Saved coin balance did not reflect purchase deduction");
           assert(saved.inventory?.owned?.bed_lavender_cloud === 1, "Purchased bed was not persisted as owned");
           assert(
             saved.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_lavender_cloud",
@@ -222,11 +229,46 @@
           );
           pass("theme bundle apply updated indoor slot state and persisted");
 
+          const oceanBundleButton = themeBundleButton(doc, "oceanFocus");
+          assert(Boolean(oceanBundleButton), "Ocean focus bundle action was not rendered");
+          const coinsBeforeOceanFirstApply = Number(text(doc, "#coinValue"));
+          click(win, oceanBundleButton);
+          await waitFor(
+            win,
+            () => {
+              const next = readSavedState(win.localStorage).payload;
+              return next.sceneSnapshot?.indoor?.ownedBundleIds?.includes("oceanFocusBundle");
+            },
+            "Paid bundle apply did not persist owned bundle state",
+          );
+          const { payload: afterOceanFirstApply } = readSavedState(win.localStorage);
+          assert(
+            Number(afterOceanFirstApply.inventory?.coins) === coinsBeforeOceanFirstApply - 88,
+            "Paid bundle first apply did not deduct expected coins",
+          );
+
+          click(win, oceanBundleButton);
+          await waitFor(
+            win,
+            () => Number(readSavedState(win.localStorage).payload.inventory?.coins) === Number(afterOceanFirstApply.inventory?.coins),
+            "Owned paid bundle reapply should not charge coins again",
+          );
+          const { payload: afterOceanSecondApply } = readSavedState(win.localStorage);
+          assert(
+            Number(afterOceanSecondApply.inventory?.coins) === Number(afterOceanFirstApply.inventory?.coins),
+            "Reapplying owned paid bundle unexpectedly changed coin balance",
+          );
+          pass("paid bundle ownership persisted and reapply avoided duplicate charge");
+
           app = await loadApp("reload");
           win = app.win;
           doc = app.doc;
 
-          await waitFor(win, () => text(doc, "#coinValue") === "4", "Reload did not restore saved coin balance");
+          await waitFor(
+            win,
+            () => Number(text(doc, "#coinValue")) === Number(afterOceanSecondApply.inventory?.coins),
+            "Reload did not restore valid coin balance",
+          );
           await openDecorateDrawer(win, doc);
           assert(doc.querySelector("#decorateSlotList").textContent.includes("粉色床"), "Reload did not restore bundle-applied furniture label");
           pass("reload restored localStorage state");

@@ -6,6 +6,7 @@ import { buildDefaultBridgeState, loadGameDataFromScripts } from "./defaults.mjs
 import { BridgeStateStore } from "./sqlite-store.mjs";
 
 const BRIDGE_SCHEMA_VERSION = 2;
+const DEV_STAGE_MIN_COINS = 999999;
 const PROJECT_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const HOST = process.env.BRIDGE_HOST || "127.0.0.1";
 const PORT = Number(process.env.BRIDGE_PORT || 8787);
@@ -136,8 +137,9 @@ function handlePing() {
 function handleSnapshotGet() {
   const current = store.readState();
   const next = deepClone(current.payload);
+  const coinUplifted = ensureDevStageCoins(next);
   const lifecycleChanged = resolveFarmLifecycleForSnapshot(next);
-  const snapshot = lifecycleChanged ? store.writeState(next, current.schemaVersion) : current;
+  const snapshot = coinUplifted || lifecycleChanged ? store.writeState(next, current.schemaVersion) : current;
   return {
     schemaVersion: snapshot.schemaVersion,
     savedAt: snapshot.savedAt,
@@ -177,6 +179,7 @@ function handleInventoryBuy(params) {
   const cost = unitPrice * quantity;
   const current = store.readState();
   const next = deepClone(current.payload);
+  ensureDevStageCoins(next);
 
   if (next.inventory.coins < cost) {
     throw new BridgeError("INSUFFICIENT_COINS", `Not enough coins. Need ${cost}, have ${next.inventory.coins}.`);
@@ -291,17 +294,122 @@ function handleSaveReset() {
 }
 
 function normalizeSnapshot(snapshot) {
+  const normalizedInventory = {
+    coins: Math.max(DEV_STAGE_MIN_COINS, Number(snapshot?.inventory?.coins) || 0),
+    owned: Object.fromEntries(
+      Object.entries(snapshot?.inventory?.owned || {}).map(([itemId, count]) => [itemId, Math.max(0, Number(count) || 0)]),
+    ),
+  };
+
+  const normalizedSceneSnapshot = normalizeSceneSnapshot(snapshot?.sceneSnapshot || {});
+
   return {
-    inventory: {
-      coins: Math.max(0, Number(snapshot?.inventory?.coins) || 0),
-      owned: Object.fromEntries(
-        Object.entries(snapshot?.inventory?.owned || {}).map(([itemId, count]) => [itemId, Math.max(0, Number(count) || 0)]),
-      ),
-    },
-    sceneSnapshot: deepClone(snapshot?.sceneSnapshot || {}),
+    inventory: normalizedInventory,
+    sceneSnapshot: normalizedSceneSnapshot,
     farmSnapshot: deepClone(snapshot?.farmSnapshot || { plots: {} }),
     savedAt: new Date().toISOString(),
   };
+}
+
+function normalizeSceneSnapshot(sceneSnapshot) {
+  return Object.fromEntries(
+    Object.entries(gameData?.scenes || {}).map(([sceneId, sceneTemplate]) => {
+      const incomingScene = sceneSnapshot?.[sceneId] || {};
+      const defaultThemeId = defaultThemeIdForScene(sceneId);
+      const themeId = canUseThemeInScene(incomingScene?.themeId, sceneId)
+        ? incomingScene.themeId
+        : defaultThemeId;
+
+      const incomingOwnedThemes = Array.isArray(incomingScene?.ownedThemeIds)
+        ? incomingScene.ownedThemeIds.filter((themeIdCandidate) => canUseThemeInScene(themeIdCandidate, sceneId))
+        : [];
+      if (themeId && !incomingOwnedThemes.includes(themeId)) {
+        incomingOwnedThemes.push(themeId);
+      }
+      if (!incomingOwnedThemes.length && defaultThemeId) {
+        incomingOwnedThemes.push(defaultThemeId);
+      }
+
+      const incomingOwnedBundles = Array.isArray(incomingScene?.ownedBundleIds)
+        ? incomingScene.ownedBundleIds.filter((bundleId) => canUseBundleInScene(bundleId, sceneId))
+        : [];
+      const inferredBundleIds = inferBundleOwnershipFromThemes(sceneId, incomingOwnedThemes);
+      const ownedBundleIds = Array.from(new Set([...incomingOwnedBundles, ...inferredBundleIds]));
+
+      const placedObjects = Object.fromEntries(
+        Object.entries(sceneTemplate?.placedObjects || {}).map(([objectId, objectTemplate]) => {
+          const incomingItemId = incomingScene?.placedObjects?.[objectId]?.itemId;
+          const incomingItem = gameData.itemCatalog?.[incomingItemId];
+          const validItemId = incomingItem && incomingItem.slots?.includes(objectTemplate.slot)
+            ? incomingItemId
+            : objectTemplate.itemId;
+          return [objectId, { itemId: validItemId }];
+        }),
+      );
+
+      return [
+        sceneId,
+        {
+          themeId,
+          ownedThemeIds: Array.from(new Set(incomingOwnedThemes)),
+          ownedBundleIds,
+          placedObjects,
+        },
+      ];
+    }),
+  );
+}
+
+function canUseThemeInScene(themeId, sceneId) {
+  const theme = gameData?.themeBundles?.themes?.[themeId];
+  return Boolean(theme && theme.sceneId === sceneId);
+}
+
+function canUseBundleInScene(bundleId, sceneId) {
+  const bundle = gameData?.themeBundles?.bundles?.[bundleId];
+  return Boolean(bundle && bundle.sceneId === sceneId);
+}
+
+function themeBundlesForScene(themeId, sceneId) {
+  const bundles = gameData?.themeBundles?.bundles || {};
+  const theme = gameData?.themeBundles?.themes?.[themeId];
+  const preferredBundleIds = Array.isArray(theme?.bundleIds) ? theme.bundleIds : [];
+  const seenBundleIds = new Set();
+  const scopedBundles = [];
+
+  preferredBundleIds.forEach((bundleId) => {
+    const bundle = bundles[bundleId];
+    if (!bundle || bundle.sceneId !== sceneId || bundle.themeId !== themeId || seenBundleIds.has(bundle.id)) return;
+    scopedBundles.push(bundle);
+    seenBundleIds.add(bundle.id);
+  });
+
+  Object.values(bundles).forEach((bundle) => {
+    if (!bundle || bundle.sceneId !== sceneId || bundle.themeId !== themeId || seenBundleIds.has(bundle.id)) return;
+    scopedBundles.push(bundle);
+    seenBundleIds.add(bundle.id);
+  });
+
+  return scopedBundles;
+}
+
+function defaultThemeIdForScene(sceneId) {
+  const themes = Object.values(gameData?.themeBundles?.themes || {}).filter((theme) => theme.sceneId === sceneId);
+  if (!themes.length) return null;
+  return themes.find((theme) => theme.saleMode === "default")?.id || themes[0].id;
+}
+
+function inferBundleOwnershipFromThemes(sceneId, themeIds = []) {
+  const sourceThemeIds = Array.isArray(themeIds) && themeIds.length
+    ? themeIds
+    : [defaultThemeIdForScene(sceneId)].filter(Boolean);
+  const ownedBundleIds = [];
+  sourceThemeIds.forEach((themeId) => {
+    themeBundlesForScene(themeId, sceneId).forEach((bundle) => {
+      if (bundle?.id) ownedBundleIds.push(bundle.id);
+    });
+  });
+  return Array.from(new Set(ownedBundleIds.filter((bundleId) => canUseBundleInScene(bundleId, sceneId))));
 }
 
 function parseBridgeRequest(text) {
@@ -350,6 +458,19 @@ function asNonEmptyString(value, message) {
     throw new BridgeError("INVALID_PARAMS", message);
   }
   return value;
+}
+
+function ensureDevStageCoins(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return false;
+  if (!snapshot.inventory || typeof snapshot.inventory !== "object") {
+    snapshot.inventory = { coins: DEV_STAGE_MIN_COINS, owned: {} };
+    return true;
+  }
+  const currentCoins = Number(snapshot.inventory.coins) || 0;
+  const upliftedCoins = Math.max(DEV_STAGE_MIN_COINS, currentCoins);
+  if (upliftedCoins === currentCoins) return false;
+  snapshot.inventory.coins = upliftedCoins;
+  return true;
 }
 
 function resolveFarmLifecycleForSnapshot(snapshot, nowIso = new Date().toISOString()) {
