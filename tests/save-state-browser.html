@@ -29,6 +29,7 @@
     <script>
       const SAVE_KEY = "agent-space-demo-save";
       const LEGACY_SAVE_KEY = "agent-space-demo-save-v1";
+      const DEV_STAGE_MIN_COINS = 999999;
       const report = document.querySelector("#report");
       const frame = document.querySelector("#appFrame");
       const assertions = [];
@@ -81,7 +82,10 @@
           const doc = appWindow.document;
           assert(doc.querySelector("#saveSchemaLabel")?.textContent === "Schema v2", "schema label should show v2");
           assert(doc.querySelector("#saveDebugMeta")?.textContent.includes("已迁移旧存档"), "debug meta should show legacy migration");
-          assert(doc.querySelector("#coinValue")?.textContent === "12", "legacy save coins should be applied");
+          assert(
+            Number(doc.querySelector("#coinValue")?.textContent || 0) >= DEV_STAGE_MIN_COINS,
+            "legacy save coins should be uplifted to dev-stage minimum",
+          );
 
           doc.querySelector("#settingsBtn").click();
           await wait(120);
@@ -93,7 +97,7 @@
           assert(saved.schemaVersion === 2, "saved payload should include schemaVersion 2");
           assert(Boolean(saved.savedAt), "saved payload should include savedAt");
           assert(Boolean(saved.inventory?.owned), "saved payload should include inventory.owned");
-          assert(saved.inventory?.coins === 12, "saved payload should preserve migrated inventory coins");
+          assert(saved.inventory?.coins >= DEV_STAGE_MIN_COINS, "saved payload should keep dev-stage minimum coins");
           assert(
             Boolean(saved.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId),
             "saved payload should include indoor placed object item ids",

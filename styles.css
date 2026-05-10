@@ -598,6 +598,20 @@ button:hover {
   text-align: left;
 }
 
+.theme-bundle-button.owned {
+  border-style: solid;
+  border-color: rgba(217, 111, 66, 0.3);
+  background: rgba(255, 242, 228, 0.85);
+}
+
+.theme-bundle-button.for-sale {
+  border-style: dashed;
+}
+
+.theme-bundle-button.unaffordable {
+  opacity: 0.64;
+}
+
 .theme-bundle-button strong {
   color: var(--ink);
   font-size: 12px;
