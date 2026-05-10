@@ -544,6 +544,11 @@ button:hover {
   gap: 8px;
 }
 
+.theme-entry {
+  display: grid;
+  gap: 6px;
+}
+
 .decor-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -575,6 +580,36 @@ button:hover {
 .theme-card.active {
   border-color: rgba(217, 111, 66, 0.46);
   background: rgba(255, 237, 219, 0.9);
+}
+
+.theme-card:disabled {
+  opacity: 0.62;
+}
+
+.theme-bundle-button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-height: 0;
+  padding: 8px 10px;
+  border: 1px dashed rgba(117, 83, 58, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  text-align: left;
+}
+
+.theme-bundle-button strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.theme-bundle-button span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.theme-bundle-button:disabled {
+  opacity: 0.58;
 }
 
 .theme-chip {
