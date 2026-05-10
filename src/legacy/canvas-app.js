@@ -158,6 +158,7 @@ const state = {
   lastFarmLifecycleTickAt: 0,
   farmLifecyclePersisting: false,
   pendingFarmAction: false,
+  pendingThemeAction: false,
 };
 
 const el = {
@@ -1314,22 +1315,97 @@ function themeCommerceText(theme, owned, equipped) {
   return price > 0 ? `${theme.rarity} · ${price} 金币` : `${theme.rarity} · 免费`;
 }
 
-async function equipSceneTheme(themeId) {
-  const scene = activeScene();
-  if (!scene || !canUseThemeInScene(themeId, state.currentScene)) return;
+function themeBundlesForScene(themeId, sceneId) {
+  const bundles = gameData.themeBundles?.bundles || {};
   const theme = gameData.themeBundles?.themes?.[themeId];
-  if (!theme) return;
+  const preferredBundleIds = Array.isArray(theme?.bundleIds) ? theme.bundleIds : [];
+  const seenBundleIds = new Set();
+  const scopedBundles = [];
+
+  preferredBundleIds.forEach((bundleId) => {
+    const bundle = bundles[bundleId];
+    if (!bundle || bundle.sceneId !== sceneId || bundle.themeId !== themeId || seenBundleIds.has(bundle.id)) return;
+    scopedBundles.push(bundle);
+    seenBundleIds.add(bundle.id);
+  });
+
+  Object.values(bundles).forEach((bundle) => {
+    if (!bundle || bundle.sceneId !== sceneId || bundle.themeId !== themeId || seenBundleIds.has(bundle.id)) return;
+    scopedBundles.push(bundle);
+    seenBundleIds.add(bundle.id);
+  });
+
+  return scopedBundles;
+}
+
+function themeBundleForApply(themeId, sceneId = state.currentScene) {
+  return themeBundlesForScene(themeId, sceneId).find((bundle) => Object.keys(bundle?.equipPlan || {}).length > 0) || null;
+}
+
+function resolveBundleEquipPlan(bundle, scene = activeScene()) {
+  const entries = [];
+  let invalid = 0;
+  Object.entries(bundle?.equipPlan || {}).forEach(([objectId, itemId]) => {
+    const zone = scene?.zones?.[objectId];
+    const item = gameData.itemCatalog[itemId];
+    if (!zone || !item || !item.slots?.includes(zone.slot)) {
+      invalid += 1;
+      return;
+    }
+    entries.push({ objectId, itemId, zone, item });
+  });
+  return {
+    entries,
+    invalid,
+    total: Object.keys(bundle?.equipPlan || {}).length,
+  };
+}
+
+function grantBundleItems(bundle) {
+  let granted = 0;
+  (bundle?.grantItems || []).forEach((itemId) => {
+    if (!gameData.itemCatalog[itemId]) return;
+    const current = Math.max(0, Number(gameData.inventory.owned[itemId]) || 0);
+    if (current <= 0) granted += 1;
+    gameData.inventory.owned[itemId] = Math.max(1, current);
+  });
+  return granted;
+}
+
+function applyBundleEquipPlanEntries(entries) {
+  let applied = 0;
+  entries.forEach(({ zone, itemId, item }) => {
+    if (zone.itemId === itemId) return;
+    zone.itemId = itemId;
+    zone.label = item.label;
+    applied += 1;
+  });
+  return applied;
+}
+
+async function equipSceneTheme(themeId, options = {}) {
+  const { skipSave = false, skipToast = false, suppressAlreadyToast = false } = options;
+  const scene = activeScene();
+  if (!scene || !canUseThemeInScene(themeId, state.currentScene)) {
+    return { ok: false, reason: "invalid" };
+  }
+  const theme = gameData.themeBundles?.themes?.[themeId];
+  if (!theme) return { ok: false, reason: "invalid" };
   if (scene.themeId === themeId) {
-    toast(`${theme.label} 已经是当前主题`);
-    return;
+    if (!skipToast && !suppressAlreadyToast) {
+      toast(`${theme.label} 已经是当前主题`);
+    }
+    return { ok: true, changed: false, bridgeSaved: true, purchased: false };
   }
 
   const wasOwned = sceneOwnsTheme(scene, themeId);
   const price = Number(theme.price || 0);
   if (!wasOwned && price > 0) {
     if (gameData.inventory.coins < price) {
-      toast(`金币不足，还差 ${price - gameData.inventory.coins}`);
-      return;
+      if (!skipToast) {
+        toast(`金币不足，还差 ${price - gameData.inventory.coins}`);
+      }
+      return { ok: false, reason: "insufficient", price };
     }
     gameData.inventory.coins = Math.max(0, gameData.inventory.coins - price);
     scene.ownedThemeIds = Array.from(new Set([...(scene.ownedThemeIds || []), themeId]));
@@ -1338,13 +1414,76 @@ async function equipSceneTheme(themeId) {
   }
 
   scene.themeId = themeId;
-  const bridgeSaved = await saveGameState();
+  const bridgeSaved = skipSave ? true : await saveGameState();
   renderDecoratePanel();
   renderStatus();
-  if (!wasOwned && price > 0) {
-    toast(`已购买并切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
-  } else {
-    toast(`已切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
+  if (!skipToast) {
+    if (!wasOwned && price > 0) {
+      toast(`已购买并切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
+    } else {
+      toast(`已切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
+    }
+  }
+  return {
+    ok: true,
+    changed: true,
+    bridgeSaved,
+    purchased: !wasOwned && price > 0,
+  };
+}
+
+async function applyThemeBundle(themeId) {
+  if (state.pendingThemeAction) return;
+  const scene = activeScene();
+  if (!scene || !canUseThemeInScene(themeId, state.currentScene)) return;
+  const theme = gameData.themeBundles?.themes?.[themeId];
+  if (!theme) return;
+  const bundle = themeBundleForApply(themeId, state.currentScene);
+  if (!bundle) {
+    toast(`${theme.label} 暂无可应用的套装`);
+    return;
+  }
+
+  const plan = resolveBundleEquipPlan(bundle, scene);
+  if (!plan.entries.length) {
+    toast(`${bundle.label} 与当前槽位不兼容`);
+    return;
+  }
+
+  state.pendingThemeAction = true;
+  renderDecoratePanel();
+  try {
+    const equipResult = await equipSceneTheme(themeId, {
+      skipSave: true,
+      skipToast: true,
+      suppressAlreadyToast: true,
+    });
+    if (!equipResult.ok) {
+      if (equipResult.reason === "insufficient") {
+        const shortfall = Math.max(0, Number(equipResult.price || 0) - gameData.inventory.coins);
+        toast(`金币不足，还差 ${shortfall}`);
+      }
+      return;
+    }
+
+    const granted = grantBundleItems(bundle);
+    const applied = applyBundleEquipPlanEntries(plan.entries);
+    const bridgeSaved = await saveGameState();
+    renderDecoratePanel();
+    renderStatus();
+
+    if (!applied && !granted) {
+      toast(`${bundle.label} 已经是当前搭配${bridgeSaved ? "" : "（离线）"}`);
+      return;
+    }
+
+    const detail = [`更新 ${applied} 个槽位`];
+    if (granted > 0) detail.push(`赠送 ${granted} 件`);
+    if (plan.invalid > 0) detail.push(`跳过 ${plan.invalid} 项不兼容`);
+    toast(`已应用 ${bundle.label}（${detail.join("，")}）${bridgeSaved ? "" : "（离线）"}`);
+  } finally {
+    state.pendingThemeAction = false;
+    renderDecoratePanel();
   }
 }
 
@@ -1365,14 +1504,39 @@ function renderThemeList() {
   themes.forEach((theme) => {
     const owned = sceneOwnsTheme(scene, theme.id);
     const equipped = scene.themeId === theme.id;
-    const button = document.createElement("button");
-    button.className = `theme-card${equipped ? " active" : ""}`;
-    button.type = "button";
-    button.innerHTML = `${themeSwatchMarkup(theme)}<span class="decor-copy"><strong>${theme.label}</strong><span>${themeCommerceText(theme, owned, equipped)}</span></span>`;
-    button.addEventListener("click", () => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "theme-entry";
+
+    const themeButton = document.createElement("button");
+    themeButton.className = `theme-card${equipped ? " active" : ""}`;
+    themeButton.type = "button";
+    themeButton.dataset.themeId = theme.id;
+    themeButton.disabled = state.pendingThemeAction;
+    themeButton.innerHTML = `${themeSwatchMarkup(theme)}<span class="decor-copy"><strong>${theme.label}</strong><span>${themeCommerceText(theme, owned, equipped)}</span></span>`;
+    themeButton.addEventListener("click", () => {
+      if (state.pendingThemeAction) return;
       void equipSceneTheme(theme.id);
     });
-    el.themeList.append(button);
+    wrapper.append(themeButton);
+
+    const bundle = themeBundleForApply(theme.id, state.currentScene);
+    if (bundle) {
+      const plan = resolveBundleEquipPlan(bundle, scene);
+      const bundleButton = document.createElement("button");
+      bundleButton.className = "theme-bundle-button";
+      bundleButton.type = "button";
+      bundleButton.dataset.themeId = theme.id;
+      bundleButton.dataset.bundleId = bundle.id;
+      bundleButton.disabled = state.pendingThemeAction || plan.entries.length <= 0;
+      bundleButton.innerHTML = `<strong>应用套装 · ${plan.entries.length}/${plan.total} 槽位</strong><span>${bundle.label}${plan.invalid > 0 ? ` · 跳过 ${plan.invalid} 项` : ""}</span>`;
+      bundleButton.addEventListener("click", () => {
+        if (state.pendingThemeAction) return;
+        void applyThemeBundle(theme.id);
+      });
+      wrapper.append(bundleButton);
+    }
+
+    el.themeList.append(wrapper);
   });
 }
 

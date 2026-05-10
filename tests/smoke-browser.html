@@ -126,6 +126,10 @@
         return Array.from(doc.querySelectorAll("#decorateItemList button")).find((button) => button.textContent.includes(label));
       }
 
+      function themeBundleButton(doc, themeId) {
+        return doc.querySelector(`#themeList .theme-bundle-button[data-theme-id="${themeId}"]`);
+      }
+
       function setComposer(doc, mode, value) {
         doc.querySelector("#intentSelect").value = mode;
         doc.querySelector("#promptInput").value = value;
@@ -199,13 +203,32 @@
           );
           pass("shop purchase and placed furniture persisted");
 
+          const warmBundleButton = themeBundleButton(doc, "warmStarter");
+          assert(Boolean(warmBundleButton), "Warm starter theme bundle action was not rendered");
+          click(win, warmBundleButton);
+          await waitFor(
+            win,
+            () => {
+              const next = readSavedState(win.localStorage).payload;
+              return next.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_pink_basic";
+            },
+            "Theme bundle apply did not persist warm starter equipPlan",
+          );
+          const { payload: bundled } = readSavedState(win.localStorage);
+          assert(bundled.inventory?.owned?.bed_pink_basic >= 1, "Bundle apply did not grant warm starter bed ownership");
+          assert(
+            bundled.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_pink_basic",
+            "Bundle apply did not update placed bed to warm starter plan",
+          );
+          pass("theme bundle apply updated indoor slot state and persisted");
+
           app = await loadApp("reload");
           win = app.win;
           doc = app.doc;
 
           await waitFor(win, () => text(doc, "#coinValue") === "4", "Reload did not restore saved coin balance");
           await openDecorateDrawer(win, doc);
-          assert(doc.querySelector("#decorateSlotList").textContent.includes("薰衣草云床"), "Reload did not restore placed furniture label");
+          assert(doc.querySelector("#decorateSlotList").textContent.includes("粉色床"), "Reload did not restore bundle-applied furniture label");
           pass("reload restored localStorage state");
 
           clearSaveKeys(win.localStorage);
