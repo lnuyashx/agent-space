@@ -74,18 +74,17 @@
               },
             }),
           );
-          frame.src = "../index.html";
+          frame.src = "../index.html?localRuntime=off";
           await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
           await wait(250);
 
           const appWindow = frame.contentWindow;
           const doc = appWindow.document;
+          await wait(250);
+          assert(appWindow.AGENT_SPACE_READY === true, "app should mark itself ready before save assertions");
           assert(doc.querySelector("#saveSchemaLabel")?.textContent === "Schema v2", "schema label should show v2");
           assert(doc.querySelector("#saveDebugMeta")?.textContent.includes("已迁移旧存档"), "debug meta should show legacy migration");
-          assert(
-            Number(doc.querySelector("#coinValue")?.textContent || 0) >= DEV_STAGE_MIN_COINS,
-            "legacy save coins should be uplifted to dev-stage minimum",
-          );
+          assert(doc.querySelector("#coinValue")?.textContent === "全解锁", "phase-one UI should show local unlocked customization");
 
           doc.querySelector("#settingsBtn").click();
           await wait(120);

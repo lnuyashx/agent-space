@@ -2,7 +2,7 @@
 
 这个文件给新 session 快速判断“项目现在是什么情况、下一步该做什么”。
 
-最后整理时间：2026-05-03
+最后整理时间：2026-05-12
 
 ## 项目状态
 
@@ -20,8 +20,9 @@
 - 点击空地角色会移动。
 - 物件交互已从大矩形热区改为 `hitAreas` 本体轮廓。
 - 装修抽屉支持槽位替换。
-- 本地商城原型支持金币购买未拥有家具。
-- `localStorage` 保存金币、库存和摆放快照。
+- 第一阶段装修按本地全解锁处理；旧金币/商城字段仅保留兼容。
+- `localStorage` 保存主题、库存兼容字段和摆放快照。
+- `npm run setup:local` 会导入当前机器的 Codex pet 视觉资产，并生成本地 `agent-state.json`。
 - Vite + TypeScript + PixiJS 项目基座已开始接入。
 - 默认 renderer 仍保留完整 legacy canvas 行为。
 - `?renderer=pixi` 可进入 PixiJS renderer foundation 预览。
@@ -34,17 +35,19 @@
 - tile/grid 或 navmesh 行走空间
 - sprite/object layer
 - item catalog + inventory + scene snapshot
-- Local Bridge / SQLite / ASP / Hub
-- 装修、农场、社交都走数据模型
+- 本地 Codex pet / agentState adapter
+- Local Bridge / SQLite / ASP / Hub 后置为可选 adapter 和联机基础
+- 装修、农场、社交都走数据模型，但第一阶段优先本地 pet 房间
 
 ## 当前推荐任务
 
 如果用户没有指定任务，按这个顺序处理 GitHub Issues：
 
-1. `#11` Web: Convert current client to Vite TypeScript PixiJS foundation
-2. `#3` Interaction: Improve walking target selection around furniture
-3. `#1` Renderer: Replace temporary furniture overlay with sprite metadata
-4. `#6` QA: Add headless browser smoke test script
+1. 本地 Codex pet 视觉房间：pet 导入、agent-state 同步、房间行为点。
+2. 房间 / 背景 / 家具自定义：本地全解锁，逐步从槽位替换升级到 `placedItems`。
+3. PixiJS 2.5D 渲染层：真实 object sprites、depth sorting、Tiled 风格对象层。
+4. 其他本地 agent adapter。
+5. 小院 / 农田生活扩展。
 
 实际可做任务以 `scripts/status.sh` 输出和 GitHub Issues 为准。
 

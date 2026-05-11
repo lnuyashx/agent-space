@@ -4,14 +4,17 @@ Agent Space is now a transitional version between a static mockup and the future
 
 ## Direction
 
+The phase-one product target is a local Codex pet / agent visual living space. Pet visuals can be imported from the user's local Codex pet package, while runtime status comes through an Agent Space adapter (`agent-state.json` first, richer adapters later). The first stage does not require a cloud backend, accounts, multiplayer, or a coin economy.
+
 The long-term product should use:
 
 - PixiJS rendering
 - tile/grid walkable space
 - sprite/object layer for furniture and crops
-- item catalog + inventory
+- item catalog + local customization state
 - placed objects saved per user room
 - scene snapshots for neighbor visits
+- local agent state adapters before cloud sync
 
 The current canvas demo keeps the static background for visual speed, but the interaction data has been moved into `data/` modules so the model already matches the future architecture.
 
@@ -30,6 +33,8 @@ The current browser data entrypoint is still `window.AGENT_SPACE_DATA`, but it i
 - `data/agents.js`: initial agent states
 - `data/farm-model.js`: crop lifecycle, plot snapshot shape, owner actions, neighbor actions, and social sync rules
 - `data/theme-bundles.js`: room theme fields, furniture bundle grants, ownership/equip flow, and renderer/data dependencies
+- `public/local-agent-space/pet-manifest.json`: generated local Codex pet visual manifest, ignored by git
+- `public/local-agent-space/agent-state.json`: generated first-stage local agent status input, ignored by git
 - `data/game-data.js`: compatibility composer that validates required modules and exposes `window.AGENT_SPACE_DATA`
 - `localStorage`: current demo persistence for inventory coins, owned items, and placed object item ids
 
@@ -42,6 +47,8 @@ In production these browser script modules should become:
 - `farmSnapshot`: plot state keyed by stable `farmPlotId`
 - `themeCatalog` / `bundleCatalog`: sellable themes and furniture packs
 - `sceneSnapshot.themeId`: equipped room theme id
+- `agentState`: local Codex / agent status, tool hint, pet id, and task label
+- `petManifest`: local pet visuals and animation mapping
 
 ## Placed Object Shape
 
@@ -132,16 +139,17 @@ Recommended staging:
    - rotation variants
    - depth sorting
 
-## Shop Flow
+## Local Customization Flow
 
-The current prototype models the minimum commerce chain without real payment:
+The previous prototype modeled a local coin shop. Phase one treats customization as local and unlocked:
 
-- `itemCatalog` owns price, rarity, category, slot compatibility, and sprite metadata.
-- `inventory.owned` decides whether a user can equip an item.
-- If an item is not owned, the drawer checks the active agent's local coins.
-- A successful purchase subtracts coins, writes `inventory.owned[itemId] = 1`, then equips the item into the selected `placedObject`.
+- `itemCatalog` still owns rarity, category, slot compatibility, and sprite metadata.
+- `price` remains only as a compatibility field for older save tests and future product experiments.
+- The drawer can equip compatible local items directly without coin checks.
+- A furniture change writes `sceneSnapshot[sceneId].placedObjects[objectId].itemId`.
+- A theme or bundle change writes `sceneSnapshot[sceneId].themeId` plus compatible placed-object item ids.
 
-Production should replace local coins with backend / wallet validation, but keep the same split between item catalog, inventory, and scene snapshot.
+Commerce can return later as a product layer, but it is not part of phase one.
 
 ## Persistence
 
@@ -150,8 +158,14 @@ The client writes a small save object to browser `localStorage`:
 - `inventory.owned`
 - `inventory.coins`
 - `sceneSnapshot[sceneId].placedObjects[objectId].itemId`
+- `sceneSnapshot[sceneId].themeId`
 
-That is only a local prototype stand-in. The production path should store the same shape through Local Bridge / SQLite first, then sync selected scene snapshots through Hub for social visits.
+That is only a local prototype stand-in. Phase one also reads generated local runtime files under `public/local-agent-space/`:
+
+- `pet-manifest.json`: imported Codex pet visual assets
+- `agent-state.json`: abstract local agent status such as `idle`, `thinking`, `coding`, `tool_calling`, `waiting_user`, `error`, or `done`
+
+The production path can later store the same shape through Local Bridge / SQLite first, then sync selected scene snapshots through Hub for social visits.
 
 The repository now includes a Local Bridge v0.1 backend bootstrap under `bridge/`:
 
@@ -160,7 +174,9 @@ The repository now includes a Local Bridge v0.1 backend bootstrap under `bridge/
 - protocol doc: `docs/asp-v0.1.zh-CN.md` and `docs/asp-v0.1.en.md`
 - minimum methods: `ping`, `snapshot.get`, `snapshot.save`, `inventory.buy`, `scene.equip`, `farm.action`, `save.reset`
 
-The current Web client is still allowed to use `localStorage` as fallback while the bridge adapter is integrated.
+The current Web client uses `localStorage` by default. The bridge adapter can still be tested explicitly with a `bridge` URL query parameter.
+
+For phase one, the bridge is optional. It should not be treated as a required backend for showing the local pet room.
 
 ## Why Not Static Background Long Term
 

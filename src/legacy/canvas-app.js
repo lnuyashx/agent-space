@@ -10,6 +10,26 @@ const BRIDGE_SAVE_KEY = "agent-space-local-bridge";
 const BRIDGE_TIMEOUT_MS = 2200;
 const FARM_LIFECYCLE_TICK_MS = 1500;
 const DEV_STAGE_MIN_COINS = 999999;
+const LOCAL_AGENT_STATE_POLL_MS = 2000;
+const LOCAL_ONLY_CUSTOMIZATION = true;
+const LOCAL_AGENT_STATUS_LABELS = {
+  idle: "本地待机",
+  thinking: "正在思考",
+  coding: "正在处理当前任务",
+  tool_calling: "正在调用本地工具",
+  waiting_user: "等待用户输入",
+  error: "需要查看异常",
+  done: "任务完成，正在放松",
+};
+const LOCAL_AGENT_STATUS_TARGETS = {
+  idle: "livingSofa",
+  thinking: "studyBookshelf",
+  coding: "studyDesk",
+  tool_calling: "studyDesk",
+  waiting_user: "gardenDoor",
+  error: "studyDesk",
+  done: "livingSofa",
+};
 const saveDebugState = {
   key: SAVE_KEY,
   schemaVersion: SAVE_SCHEMA_VERSION,
@@ -160,6 +180,8 @@ const state = {
   farmLifecyclePersisting: false,
   pendingFarmAction: false,
   pendingThemeAction: false,
+  localAgentStateSignature: null,
+  localAgentStateTimer: null,
 };
 
 const el = {
@@ -570,6 +592,65 @@ function activeScene() {
   return scenes[state.currentScene];
 }
 
+function localRuntime() {
+  return window.AGENT_SPACE_LOCAL_RUNTIME || gameData.localRuntime || null;
+}
+
+function activeLocalAgentState() {
+  return localRuntime()?.agentState || null;
+}
+
+function localAgentLabel(agentState = activeLocalAgentState()) {
+  if (!agentState) return null;
+  const status = agentState.status || "idle";
+  const baseLabel = agentState.taskLabel || LOCAL_AGENT_STATUS_LABELS[status] || status;
+  return agentState.activeTool ? `${baseLabel} · ${agentState.activeTool}` : baseLabel;
+}
+
+function localAgentTargetZone(agentState = activeLocalAgentState()) {
+  const objectId = LOCAL_AGENT_STATUS_TARGETS[agentState?.status] || LOCAL_AGENT_STATUS_TARGETS.idle;
+  return scenes.indoor.zones[objectId] || scenes.indoor.zones.livingSofa || null;
+}
+
+function petFrameForAnimation(animationKey, timeMs = Date.now()) {
+  const pet = localRuntime()?.pet;
+  const grid = pet?.frameGrid;
+  if (!grid) return null;
+  const row = grid.states?.[animationKey] || grid.states?.idle;
+  if (!row) return null;
+  const durations = Array.isArray(row.durations) && row.durations.length
+    ? row.durations
+    : Array.from({ length: row.frames || 1 }, () => 160);
+  const totalMs = durations.reduce((sum, duration) => sum + Math.max(1, Number(duration) || 1), 0);
+  let cursor = totalMs ? timeMs % totalMs : 0;
+  let frame = 0;
+  for (let index = 0; index < durations.length; index += 1) {
+    cursor -= Math.max(1, Number(durations[index]) || 1);
+    if (cursor <= 0) {
+      frame = index;
+      break;
+    }
+  }
+  const maxFrame = Math.max(0, Math.min(row.frames || durations.length || 1, grid.columns || 1) - 1);
+  return {
+    x: Math.min(frame, maxFrame) * grid.cellWidth,
+    y: row.row * grid.cellHeight,
+    w: grid.cellWidth,
+    h: grid.cellHeight,
+  };
+}
+
+function currentPetFrame(timeMs = Date.now()) {
+  const runtime = localRuntime();
+  if (!runtime?.pet?.frameGrid) return null;
+  if (state.agent.status === "walking") {
+    return petFrameForAnimation("running-right", timeMs);
+  }
+  const agentState = activeLocalAgentState();
+  const animationKey = runtime.pet.stateToAnimation?.[agentState?.status || "idle"] || "idle";
+  return petFrameForAnimation(animationKey, timeMs);
+}
+
 function activeSceneImage() {
   const scene = activeScene();
   const decoratingImage = state.decorating ? scene.decoratingImage : null;
@@ -708,6 +789,9 @@ function itemForZone(zone) {
 }
 
 function ownedCount(itemId) {
+  if (LOCAL_ONLY_CUSTOMIZATION && gameData.itemCatalog[itemId]?.actions?.includes("decorate_replace")) {
+    return Math.max(1, Number(gameData.inventory.owned[itemId]) || 0);
+  }
   return gameData.inventory.owned[itemId] || 0;
 }
 
@@ -753,6 +837,9 @@ function itemPrice(item) {
 
 function itemCommerceText(itemId, item) {
   const owned = ownedCount(itemId);
+  if (LOCAL_ONLY_CUSTOMIZATION && item?.actions?.includes("decorate_replace")) {
+    return `${item.category} · 本地可用`;
+  }
   if (owned > 0) return `${item.category} · 拥有 ${owned}`;
   return `${item.category} · ${itemPrice(item)} 金币`;
 }
@@ -1244,8 +1331,14 @@ function drawAgent(time) {
   ctx.ellipse(0, 24 - bob / scale, 21, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   if (agentImage.complete && agentImage.naturalWidth) {
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(agentImage, 0, 0, agentImage.naturalWidth, agentImage.naturalHeight, -34, -116, 68, 116);
+    const petFrame = currentPetFrame(time);
+    if (petFrame) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(agentImage, petFrame.x, petFrame.y, petFrame.w, petFrame.h, -46, -102, 92, 100);
+    } else {
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(agentImage, 0, 0, agentImage.naturalWidth, agentImage.naturalHeight, -34, -116, 68, 116);
+    }
   }
   if (state.agent.status === "working") {
     pixelRect(-30, -2, 60, 21, "#fffaf1", "rgba(32, 23, 17, .3)");
@@ -1350,6 +1443,7 @@ function themeSwatchMarkup(theme) {
 
 function themeCommerceText(theme, owned, equipped) {
   if (equipped) return `${theme.rarity} · 已装备`;
+  if (LOCAL_ONLY_CUSTOMIZATION) return `${theme.rarity} · 本地可用`;
   if (owned) return `${theme.rarity} · 已拥有`;
   const price = Number(theme.price || 0);
   return price > 0 ? `${theme.rarity} · ${price} 金币` : `${theme.rarity} · 免费`;
@@ -1439,7 +1533,7 @@ async function equipSceneTheme(themeId, options = {}) {
   }
 
   const wasOwned = sceneOwnsTheme(scene, themeId);
-  const price = Number(theme.price || 0);
+  const price = LOCAL_ONLY_CUSTOMIZATION ? 0 : Number(theme.price || 0);
   if (!wasOwned && price > 0) {
     if (gameData.inventory.coins < price) {
       if (!skipToast) {
@@ -1458,11 +1552,7 @@ async function equipSceneTheme(themeId, options = {}) {
   renderDecoratePanel();
   renderStatus();
   if (!skipToast) {
-    if (!wasOwned && price > 0) {
-      toast(`已购买并切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
-    } else {
-      toast(`已切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
-    }
+    toast(`已切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
   }
   return {
     ok: true,
@@ -1493,7 +1583,7 @@ async function applyThemeBundle(themeId) {
   state.pendingThemeAction = true;
   renderDecoratePanel();
   try {
-    const bundlePrice = Number(bundle.price || 0);
+    const bundlePrice = LOCAL_ONLY_CUSTOMIZATION ? 0 : Number(bundle.price || 0);
     const wasBundleOwned = sceneOwnsBundle(scene, bundle.id);
     if (!wasBundleOwned) {
       if (bundlePrice > 0 && gameData.inventory.coins < bundlePrice) {
@@ -1533,9 +1623,7 @@ async function applyThemeBundle(themeId) {
     if (granted > 0) detail.push(`赠送 ${granted} 件`);
     if (plan.invalid > 0) detail.push(`跳过 ${plan.invalid} 项不兼容`);
     let actionLabel = "已应用";
-    if (acquiredBundle && bundlePrice > 0) {
-      actionLabel = "已购买并应用";
-    } else if (acquiredBundle) {
+    if (acquiredBundle) {
       actionLabel = "已领取并应用";
     }
     toast(`${actionLabel} ${bundle.label}（${detail.join("，")}）${bridgeSaved ? "" : "（离线）"}`);
@@ -1580,8 +1668,8 @@ function renderThemeList() {
     const bundle = themeBundleForApply(theme.id, state.currentScene);
     if (bundle) {
       const plan = resolveBundleEquipPlan(bundle, scene);
-      const bundleOwned = sceneOwnsBundle(scene, bundle.id);
-      const bundlePrice = Number(bundle.price || 0);
+      const bundleOwned = LOCAL_ONLY_CUSTOMIZATION || sceneOwnsBundle(scene, bundle.id);
+      const bundlePrice = LOCAL_ONLY_CUSTOMIZATION ? 0 : Number(bundle.price || 0);
       const unaffordable = !bundleOwned && bundlePrice > gameData.inventory.coins;
       const bundleButton = document.createElement("button");
       bundleButton.className = [
@@ -1598,7 +1686,7 @@ function renderThemeList() {
         : bundlePrice > 0
           ? `购买并应用 · ${bundlePrice} 金币`
           : "领取并应用";
-      bundleButton.innerHTML = `<strong>${bundleActionLabel} · ${plan.entries.length}/${plan.total} 槽位</strong><span>${bundle.label}${plan.invalid > 0 ? ` · 跳过 ${plan.invalid} 项` : bundleOwned ? " · 已拥有" : ""}</span>`;
+      bundleButton.innerHTML = `<strong>${bundleActionLabel} · ${plan.entries.length}/${plan.total} 槽位</strong><span>${bundle.label}${plan.invalid > 0 ? ` · 跳过 ${plan.invalid} 项` : LOCAL_ONLY_CUSTOMIZATION ? " · 本地可用" : bundleOwned ? " · 已拥有" : ""}</span>`;
       bundleButton.addEventListener("click", () => {
         if (state.pendingThemeAction) return;
         void applyThemeBundle(theme.id);
@@ -1686,6 +1774,9 @@ async function replaceDecorItem(itemId) {
   const item = gameData.itemCatalog[itemId];
   if (!zone || !item || !item.slots?.includes(zone.slot)) return;
   if (!(await ensureOwned(itemId, item))) return;
+  if (LOCAL_ONLY_CUSTOMIZATION) {
+    gameData.inventory.owned[itemId] = Math.max(1, Number(gameData.inventory.owned[itemId]) || 0);
+  }
   zone.itemId = itemId;
   zone.label = item.label;
   state.hotspotPulse = { zone, until: Date.now() + 900 };
@@ -1701,6 +1792,10 @@ async function replaceDecorItem(itemId) {
 
 async function ensureOwned(itemId, item) {
   if (ownedCount(itemId) > 0) return true;
+  if (LOCAL_ONLY_CUSTOMIZATION && item?.actions?.includes("decorate_replace")) {
+    gameData.inventory.owned[itemId] = Math.max(1, Number(gameData.inventory.owned[itemId]) || 0);
+    return true;
+  }
   const price = itemPrice(item);
   if (!price) {
     toast(`${item.label} 暂未开放购买`);
@@ -2124,6 +2219,86 @@ function targetZoneForTask(kind) {
   return findZoneByAction("indoor", "preview_work", "studyDesk");
 }
 
+function normalizeLocalAgentState(input) {
+  if (!input || typeof input !== "object") return null;
+  const status = LOCAL_AGENT_STATUS_LABELS[input.status] ? input.status : "idle";
+  return {
+    schemaVersion: 1,
+    agentId: input.agentId || "codex-local",
+    petId: input.petId || localRuntime()?.pet?.id || null,
+    status,
+    taskLabel: input.taskLabel || LOCAL_AGENT_STATUS_LABELS[status],
+    activeTool: input.activeTool || null,
+    updatedAt: input.updatedAt || new Date().toISOString(),
+  };
+}
+
+function localAgentStateSignature(agentState) {
+  return [
+    agentState?.agentId,
+    agentState?.petId,
+    agentState?.status,
+    agentState?.taskLabel,
+    agentState?.activeTool,
+    agentState?.updatedAt,
+  ].join("|");
+}
+
+function applyLocalAgentState(agentState, options = {}) {
+  const normalized = normalizeLocalAgentState(agentState);
+  if (!normalized) return;
+  const runtime = localRuntime();
+  if (runtime) runtime.agentState = normalized;
+
+  const signature = localAgentStateSignature(normalized);
+  if (!options.force && state.localAgentStateSignature === signature) return;
+  state.localAgentStateSignature = signature;
+
+  const targetZone = localAgentTargetZone(normalized);
+  const label = localAgentLabel(normalized);
+  if (!targetZone || !label) return;
+  if (state.currentScene !== "indoor") {
+    setScene("indoor", { silent: true, status: label });
+  }
+
+  state.working = normalized.status === "coding" || normalized.status === "tool_calling";
+  const working = state.working;
+  activeAgent().realStatus = label;
+  moveAgentTo(zoneInteractionPoint(targetZone, scenes.indoor), label, {
+    working,
+    showTarget: false,
+  });
+  if (normalized.status === "error") {
+    setBubble("本地状态显示异常，需要查看。", 3200);
+  } else if (normalized.status === "waiting_user") {
+    setBubble("我在等你下一步。", 2600);
+  }
+  renderStatus();
+}
+
+async function fetchLocalAgentState() {
+  const runtime = localRuntime();
+  const statePath = runtime?.agentStatePath || "/local-agent-space/agent-state.json";
+  try {
+    const response = await fetch(`${statePath}?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function startLocalAgentStateSync() {
+  const runtime = localRuntime();
+  if (!runtime) return;
+  if (!runtime.agentStateAvailable && runtime.status !== "local-pet") return;
+  applyLocalAgentState(runtime.agentState, { force: true });
+  state.localAgentStateTimer = window.setInterval(async () => {
+    const next = await fetchLocalAgentState();
+    if (next) applyLocalAgentState(next);
+  }, LOCAL_AGENT_STATE_POLL_MS);
+}
+
 function sendPrompt() {
   const text = el.promptInput.value.trim();
   if (!text) return;
@@ -2233,8 +2408,9 @@ function openArtifact() {
 
 function renderStatus() {
   const agent = activeAgent();
-  el.activeAgentName.textContent = state.activeAgent;
-  el.coinValue.textContent = String(gameData.inventory.coins);
+  const runtime = localRuntime();
+  el.activeAgentName.textContent = runtime?.pet?.displayName || state.activeAgent;
+  el.coinValue.textContent = LOCAL_ONLY_CUSTOMIZATION ? "全解锁" : String(gameData.inventory.coins);
   el.energyText.textContent = String(Math.round(agent.energy));
   el.moodText.textContent = String(Math.round(agent.mood));
   el.expText.textContent = String(Math.round(agent.exp));
@@ -2257,8 +2433,10 @@ function renderStatus() {
       const selectedZone = selectedFarmZone();
       const summary = selectedZone ? farmSummaryForZone(selectedZone) : null;
       el.previewHint.textContent = farmPreviewHint(summary);
+    } else if (runtime?.status === "local-pet") {
+      el.previewHint.textContent = "本地 Codex pet";
     } else {
-      el.previewHint.textContent = "真实状态";
+      el.previewHint.textContent = "本地状态";
     }
   }
   drawAvatar();
@@ -2271,7 +2449,7 @@ function resolveBridgeUrl() {
   const override = query.get("bridge");
   if (override === "off") return null;
   if (override) return override;
-  return "ws://127.0.0.1:8787/bridge";
+  return null;
 }
 
 function bridgeRequest(method, params = {}) {
@@ -2450,9 +2628,15 @@ function switchAgent(name) {
 
 function drawAvatar() {
   avatarCtx.clearRect(0, 0, 72, 72);
-  avatarCtx.imageSmoothingEnabled = true;
   if (agentImage.complete && agentImage.naturalWidth) {
-    avatarCtx.drawImage(agentImage, 220, 40, 610, 760, 6, 0, 60, 74);
+    const petFrame = petFrameForAnimation("idle", Date.now());
+    if (petFrame) {
+      avatarCtx.imageSmoothingEnabled = false;
+      avatarCtx.drawImage(agentImage, petFrame.x, petFrame.y, petFrame.w, petFrame.h, 7, 5, 58, 63);
+    } else {
+      avatarCtx.imageSmoothingEnabled = true;
+      avatarCtx.drawImage(agentImage, 220, 40, 610, 760, 6, 0, 60, 74);
+    }
   }
 }
 
@@ -2564,5 +2748,9 @@ window.addEventListener("hashchange", () => {
 
 renderStatus();
 switchAgent("Aria");
+startLocalAgentStateSync();
 void hydrateFromBridge();
+window.AGENT_SPACE_READY = true;
 requestAnimationFrame(draw);
+
+export {};

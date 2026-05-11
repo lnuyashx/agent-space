@@ -2,7 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TEST_URL="file://${ROOT_DIR}/tests/smoke-browser.html"
+PORT="${AGENT_SPACE_TEST_PORT:-5174}"
+HOST="127.0.0.1"
+TEST_URL="http://${HOST}:${PORT}/tests/smoke-browser.html"
 VIRTUAL_TIME_BUDGET_MS="${SMOKE_VIRTUAL_TIME_BUDGET_MS:-12000}"
 
 if [[ -n "${CHROME_BIN:-}" ]]; then
@@ -20,13 +22,35 @@ else
   exit 127
 fi
 
+VITE_LOG="$(mktemp -t agent-space-smoke-vite.XXXXXX.log)"
+"${ROOT_DIR}/node_modules/.bin/vite" --host "$HOST" --port "$PORT" --strictPort >"$VITE_LOG" 2>&1 &
+VITE_PID=$!
+cleanup() {
+  kill "$VITE_PID" >/dev/null 2>&1 || true
+  wait "$VITE_PID" >/dev/null 2>&1 || true
+  rm -f "$VITE_LOG"
+}
+trap cleanup EXIT
+
+for _ in $(seq 1 60); do
+  if curl -fsS "http://${HOST}:${PORT}/" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+
+if ! curl -fsS "http://${HOST}:${PORT}/" >/dev/null 2>&1; then
+  cat "$VITE_LOG" >&2
+  echo "Vite test server did not start." >&2
+  exit 1
+fi
+
 set +e
 OUTPUT="$(
   "$CHROME" \
     --headless=new \
     --disable-gpu \
     --no-sandbox \
-    --allow-file-access-from-files \
     --window-size=1360,960 \
     --virtual-time-budget="$VIRTUAL_TIME_BUDGET_MS" \
     --dump-dom \
