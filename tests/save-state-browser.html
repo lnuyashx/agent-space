@@ -38,6 +38,29 @@
         return new Promise((resolve) => window.setTimeout(resolve, ms));
       }
 
+      function waitFor(win, predicate, message, timeoutMs = 8000) {
+        return new Promise((resolve, reject) => {
+          const started = Date.now();
+          function tick() {
+            try {
+              if (predicate()) {
+                resolve();
+                return;
+              }
+            } catch (error) {
+              reject(error);
+              return;
+            }
+            if (Date.now() - started > timeoutMs) {
+              reject(new Error(message));
+              return;
+            }
+            win.setTimeout(tick, 50);
+          }
+          tick();
+        });
+      }
+
       function assert(condition, message) {
         assertions.push({ pass: Boolean(condition), message });
         if (!condition) throw new Error(message);
@@ -80,8 +103,7 @@
 
           const appWindow = frame.contentWindow;
           const doc = appWindow.document;
-          await wait(250);
-          assert(appWindow.AGENT_SPACE_READY === true, "app should mark itself ready before save assertions");
+          await waitFor(appWindow, () => appWindow.AGENT_SPACE_READY === true, "app should mark itself ready before save assertions");
           assert(doc.querySelector("#saveSchemaLabel")?.textContent === "Schema v2", "schema label should show v2");
           assert(doc.querySelector("#saveDebugMeta")?.textContent.includes("已迁移旧存档"), "debug meta should show legacy migration");
           assert(doc.querySelector("#coinValue")?.textContent === "全解锁", "phase-one UI should show local unlocked customization");

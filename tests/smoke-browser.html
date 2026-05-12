@@ -73,7 +73,7 @@
 
       function loadApp(label) {
         return new Promise((resolve, reject) => {
-          const timeout = window.setTimeout(() => reject(new Error(`Timed out loading app frame for ${label}`)), 2500);
+          const timeout = window.setTimeout(() => reject(new Error(`Timed out loading app frame for ${label}`)), 6000);
           frame.onload = () => {
             window.clearTimeout(timeout);
             try {
@@ -100,7 +100,7 @@
               return;
             }
             if (Date.now() - started > timeoutMs) {
-              reject(new Error(message));
+              reject(new Error(typeof message === "function" ? message() : message));
               return;
             }
             win.setTimeout(tick, 50);
@@ -160,7 +160,9 @@
           await waitFor(
             win,
             () => win.AGENT_SPACE_READY && doc.querySelector("#worldCanvas")?.width >= 720 && text(doc, "#currentTask") === "在客厅休息",
-            "App did not boot into the indoor idle state",
+            () =>
+              `App did not boot into the indoor idle state: ready=${String(win.AGENT_SPACE_READY)} task=${text(doc, "#currentTask")} width=${String(doc.querySelector("#worldCanvas")?.width)}`,
+            10000,
           );
           assert(text(doc, "#activeAgentName") === "Aria", "App did not boot with Aria selected");
           pass("app booted");

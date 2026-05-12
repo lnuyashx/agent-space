@@ -2380,16 +2380,17 @@ function finishTask(prompt, kind) {
   };
   agent.realStatus = "任务完成，等你查看";
   setBubble("做好了，点我头顶的标记");
-  toast("任务完成，点击 Aria 头顶标记查看");
+  toast(`任务完成，点击 ${activeAgentDisplayName()} 头顶标记查看`);
   renderStatus();
 }
 
 function buildArtifact(prompt, kind) {
+  const agentName = activeAgentDisplayName();
   if (kind === "research") {
     return `# 查资料结果\n\n任务：${prompt}\n\n- Agent 会移动到书柜边，表示查资料 / 搜索\n- 这个状态和电脑前工作分开\n- 真实产品里搜索结果会由本地 Bridge 写入 artifact`;
   }
   if (kind === "cook") {
-    return `# 厨房产物\n\n任务：${prompt}\n\nAria 做了一份小菜单：番茄热汤、香草煎蛋、清甜白菜沙拉。`;
+    return `# 厨房产物\n\n任务：${prompt}\n\n${agentName} 做了一份小菜单：番茄热汤、香草煎蛋、清甜白菜沙拉。`;
   }
   if (kind === "plan") {
     return `# 计划草稿\n\n任务：${prompt}\n\n- 先保持客厅聊天状态\n- 再把确认后的事项转成工作任务\n- 需要执行时移动到电脑前`;
@@ -2406,10 +2407,32 @@ function openArtifact() {
   el.artifactDrawer.setAttribute("aria-hidden", "false");
 }
 
+function localPetDisplayName() {
+  const runtime = localRuntime();
+  if (runtime?.status !== "local-pet") return null;
+  return runtime?.pet?.displayName || runtime?.pet?.id || null;
+}
+
+function activeAgentDisplayName(name = state.activeAgent) {
+  return localPetDisplayName() || name;
+}
+
+function renderAgentTabs() {
+  const localName = localPetDisplayName();
+  if (!localName) return;
+  el.agentTabs.innerHTML = "";
+  const button = document.createElement("button");
+  button.className = "active";
+  button.type = "button";
+  button.dataset.agent = state.activeAgent;
+  button.textContent = localName;
+  el.agentTabs.append(button);
+}
+
 function renderStatus() {
   const agent = activeAgent();
   const runtime = localRuntime();
-  el.activeAgentName.textContent = runtime?.pet?.displayName || state.activeAgent;
+  el.activeAgentName.textContent = activeAgentDisplayName();
   el.coinValue.textContent = LOCAL_ONLY_CUSTOMIZATION ? "全解锁" : String(gameData.inventory.coins);
   el.energyText.textContent = String(Math.round(agent.energy));
   el.moodText.textContent = String(Math.round(agent.mood));
@@ -2621,7 +2644,7 @@ function switchAgent(name) {
   document.querySelectorAll(".agent-tabs button").forEach((button) => {
     button.classList.toggle("active", button.dataset.agent === name);
   });
-  el.promptInput.placeholder = `对 ${name} 说句话，或让 TA 做点事...`;
+  el.promptInput.placeholder = `对 ${activeAgentDisplayName(name)} 说句话，或让 TA 做点事...`;
   renderStatus();
   if (state.decorating) renderDecoratePanel();
 }
@@ -2747,6 +2770,7 @@ window.addEventListener("hashchange", () => {
 });
 
 renderStatus();
+renderAgentTabs();
 switchAgent("Aria");
 startLocalAgentStateSync();
 void hydrateFromBridge();
