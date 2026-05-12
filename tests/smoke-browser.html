@@ -195,6 +195,18 @@
           await openDecorateDrawer(win, doc);
           pass("decoration drawer opened");
 
+          const codingStateButton = doc.querySelector('[data-local-agent-status="coding"]');
+          assert(Boolean(codingStateButton), "Local agent state preview controls were not rendered");
+          click(win, codingStateButton);
+          await waitFor(
+            win,
+            () =>
+              text(doc, "#currentTask") === "正在处理当前任务" &&
+              doc.querySelector('[data-local-agent-status="coding"]')?.classList.contains("active"),
+            () => `Local agent coding state preview did not update the room state: task=${text(doc, "#currentTask")}`,
+          );
+          pass("local agent state preview updated room behavior");
+
           const lavenderButton = itemButton(doc, "薰衣草云床");
           assert(Boolean(lavenderButton), "Local decoration item 薰衣草云床 was not listed");
           assert(lavenderButton.textContent.includes("本地可用"), "Local decoration item was not marked as locally available");

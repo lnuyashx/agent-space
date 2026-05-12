@@ -21,6 +21,15 @@ const LOCAL_AGENT_STATUS_LABELS = {
   error: "需要查看异常",
   done: "任务完成，正在放松",
 };
+const LOCAL_AGENT_STATUS_OPTIONS = [
+  { status: "idle", label: "待机", tool: null },
+  { status: "thinking", label: "思考", tool: null },
+  { status: "coding", label: "写代码", tool: null },
+  { status: "tool_calling", label: "工具", tool: "terminal" },
+  { status: "waiting_user", label: "等你", tool: null },
+  { status: "done", label: "完成", tool: null },
+  { status: "error", label: "异常", tool: null },
+];
 const LOCAL_AGENT_STATUS_TARGETS = {
   idle: "livingSofa",
   thinking: "studyBookshelf",
@@ -182,6 +191,10 @@ const state = {
   pendingThemeAction: false,
   localAgentStateSignature: null,
   localAgentStateTimer: null,
+  localAgentStateSource: "init",
+  localAgentPreviewLocked: false,
+  syncedLocalAgentState: null,
+  syncedLocalAgentStateSource: "fallback",
 };
 
 const el = {
@@ -214,6 +227,8 @@ const el = {
   saveSchemaLabel: document.querySelector("#saveSchemaLabel"),
   saveDebugMeta: document.querySelector("#saveDebugMeta"),
   resetSaveBtn: document.querySelector("#resetSaveBtn"),
+  localStateControls: document.querySelector("#localStateControls"),
+  localStateMeta: document.querySelector("#localStateMeta"),
   farmActionPanel: document.querySelector("#farmActionPanel"),
   farmPanelTitle: document.querySelector("#farmPanelTitle"),
   farmPanelState: document.querySelector("#farmPanelState"),
@@ -2249,6 +2264,11 @@ function applyLocalAgentState(agentState, options = {}) {
   if (!normalized) return;
   const runtime = localRuntime();
   if (runtime) runtime.agentState = normalized;
+  if (options.source) state.localAgentStateSource = options.source;
+  if (options.remember) {
+    state.syncedLocalAgentState = normalized;
+    state.syncedLocalAgentStateSource = options.source || state.localAgentStateSource;
+  }
 
   const signature = localAgentStateSignature(normalized);
   if (!options.force && state.localAgentStateSignature === signature) return;
@@ -2291,11 +2311,18 @@ async function fetchLocalAgentState() {
 function startLocalAgentStateSync() {
   const runtime = localRuntime();
   if (!runtime) return;
-  if (!runtime.agentStateAvailable && runtime.status !== "local-pet") return;
-  applyLocalAgentState(runtime.agentState, { force: true });
+  if (!runtime.agentStateAvailable && runtime.status !== "local-pet") {
+    state.syncedLocalAgentState = normalizeLocalAgentState(runtime.agentState);
+    state.syncedLocalAgentStateSource = "fallback";
+    state.localAgentStateSource = "fallback";
+    renderLocalStateControls();
+    return;
+  }
+  applyLocalAgentState(runtime.agentState, { force: true, remember: true, source: "file" });
   state.localAgentStateTimer = window.setInterval(async () => {
+    if (state.localAgentPreviewLocked) return;
     const next = await fetchLocalAgentState();
-    if (next) applyLocalAgentState(next);
+    if (next) applyLocalAgentState(next, { remember: true, source: "file" });
   }, LOCAL_AGENT_STATE_POLL_MS);
 }
 
@@ -2429,6 +2456,68 @@ function renderAgentTabs() {
   el.agentTabs.append(button);
 }
 
+function localAgentStateSourceLabel() {
+  if (state.localAgentPreviewLocked || state.localAgentStateSource === "preview") return "预览中";
+  if (state.localAgentStateSource === "file") return "agent-state.json";
+  return "内置状态";
+}
+
+function renderLocalStateControls() {
+  if (!el.localStateControls || !el.localStateMeta) return;
+  const currentStatus = activeLocalAgentState()?.status || "idle";
+  el.localStateControls.innerHTML = "";
+
+  LOCAL_AGENT_STATUS_OPTIONS.forEach((option) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.localAgentStatus = option.status;
+    button.classList.toggle("active", option.status === currentStatus);
+    button.setAttribute("aria-pressed", option.status === currentStatus ? "true" : "false");
+    button.textContent = option.label;
+    el.localStateControls.append(button);
+  });
+
+  const resetButton = document.createElement("button");
+  resetButton.type = "button";
+  resetButton.dataset.localAgentReset = "true";
+  resetButton.textContent = "文件";
+  el.localStateControls.append(resetButton);
+  el.localStateMeta.textContent = `${localAgentStateSourceLabel()} · ${localAgentLabel() || LOCAL_AGENT_STATUS_LABELS.idle}`;
+}
+
+function previewLocalAgentStatus(status) {
+  const option = LOCAL_AGENT_STATUS_OPTIONS.find((item) => item.status === status);
+  if (!option) return;
+  const current = activeLocalAgentState() || state.syncedLocalAgentState || {};
+  const next = {
+    ...current,
+    status: option.status,
+    taskLabel: LOCAL_AGENT_STATUS_LABELS[option.status],
+    activeTool: option.tool,
+    updatedAt: new Date().toISOString(),
+  };
+  state.localAgentPreviewLocked = true;
+  applyLocalAgentState(next, { force: true, source: "preview" });
+  renderLocalStateControls();
+  toast(`状态预览：${LOCAL_AGENT_STATUS_LABELS[option.status]}`);
+}
+
+async function resetLocalAgentPreview() {
+  state.localAgentPreviewLocked = false;
+  const next = await fetchLocalAgentState();
+  if (next) {
+    applyLocalAgentState(next, { force: true, remember: true, source: "file" });
+  } else {
+    applyLocalAgentState(state.syncedLocalAgentState || localRuntime()?.agentState, {
+      force: true,
+      remember: true,
+      source: state.syncedLocalAgentStateSource || "fallback",
+    });
+  }
+  renderLocalStateControls();
+  toast("已回到本地状态文件");
+}
+
 function renderStatus() {
   const agent = activeAgent();
   const runtime = localRuntime();
@@ -2464,6 +2553,7 @@ function renderStatus() {
   }
   drawAvatar();
   renderSaveDebug();
+  renderLocalStateControls();
   renderFarmActionPanel();
 }
 
@@ -2747,6 +2837,18 @@ document.querySelector("#settingsBtn").addEventListener("click", () => {
     return;
   }
   openDecoratePanel();
+});
+
+el.localStateControls?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.dataset.localAgentReset) {
+    void resetLocalAgentPreview();
+    return;
+  }
+  if (button.dataset.localAgentStatus) {
+    previewLocalAgentStatus(button.dataset.localAgentStatus);
+  }
 });
 
 el.modeBtn.addEventListener("click", () => {

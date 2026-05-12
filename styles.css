@@ -526,6 +526,10 @@ button:hover {
   grid-column: 1 / -1;
 }
 
+.local-state-section {
+  grid-column: 1 / -1;
+}
+
 .decorate-body h3 {
   margin: 0 0 10px;
   color: var(--muted);
@@ -542,6 +546,40 @@ button:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
+}
+
+.local-state-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+}
+
+.local-state-controls button {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #4a3c32;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.local-state-controls button.active {
+  border-color: rgba(63, 143, 115, 0.44);
+  background: rgba(228, 248, 240, 0.9);
+  color: #1d4738;
+}
+
+.local-state-controls button[data-local-agent-reset] {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+#localStateMeta {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .theme-entry {

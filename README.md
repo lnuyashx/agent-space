@@ -44,6 +44,7 @@ http://127.0.0.1:5173/?renderer=pixi
 - 临时对象层：装修模式会切到空房间 prototype 背景，再按 `itemCatalog[itemId].sprite` 在对应槽位绘制独立家具；正式版会换成真实 sprite atlas 和生产级空房间底图
 - 本地快照：已摆放家具、主题和开发期兼容字段会按 `schemaVersion` 写入浏览器 `localStorage`，刷新后保留；设置抽屉里可查看存档状态并重置本地存档
 - 本地 pet runtime：`scripts/setup-local.mjs` 会导入当前机器的 Codex pet 视觉资产，并创建 `agent-state.json` 作为第一阶段状态同步入口
+- 本地状态调试：`npm run agent:state -- coding` 会写入状态文件；设置抽屉里的 Agent 状态按钮可快速预览房间行为映射
 - Agent 状态面板、能量、心情、经验
 - 输入聊天、移动、派任务
 - 工作可视化：接任务、走到工作位、工作中、完成标记、Artifact 抽屉

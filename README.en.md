@@ -42,6 +42,7 @@ This PixiJS entry is the first stage of the production renderer. Backgrounds, ob
 - Slot-based decoration drawer with locally unlocked themes and furniture.
 - Browser `localStorage` save for theme and placed furniture state, with old coin fields kept only for compatibility.
 - Local pet runtime through `scripts/setup-local.mjs`, `pet-manifest.json`, and `agent-state.json`.
+- Local state debug flow through `npm run agent:state -- coding`, plus in-drawer status preview buttons for room behavior mapping.
 - PixiJS renderer foundation in `src/pixi/pixi-foundation.ts`.
 
 ## Product Direction

@@ -81,6 +81,16 @@ public/local-agent-space/agent-state.json
 
 前端每隔短时间轮询该文件，并把状态映射到房间行为。
 
+本地调试可以直接写入状态文件：
+
+```sh
+npm run agent:state -- coding
+npm run agent:state -- tool_calling 正在运行命令 terminal
+npm run agent:state -- waiting_user 等待你确认
+```
+
+设置抽屉里的「Agent 状态」按钮只做前端预览，不写文件；点击「文件」会回到 `agent-state.json` 同步。
+
 ## 状态映射
 
 | agent 状态 | pet 动画 | 房间行为点 |

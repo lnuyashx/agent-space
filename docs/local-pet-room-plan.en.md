@@ -81,6 +81,16 @@ Example:
 
 The frontend polls this file and maps state to room behavior.
 
+For local debugging, write the state file directly:
+
+```sh
+npm run agent:state -- coding
+npm run agent:state -- tool_calling "Running a command" terminal
+npm run agent:state -- waiting_user "Waiting for confirmation"
+```
+
+The in-drawer Agent State buttons are frontend previews only; they do not write the file. The File button returns to `agent-state.json` sync.
+
 ## State Mapping
 
 | agent state | pet animation | room anchor |
@@ -104,4 +114,3 @@ Phase one keeps the current project foundation:
 - Tiled/LDtk-style object layers for future room, furniture, behavior-anchor, and collision data.
 
 Reldens / Colyseus are not introduced in phase one because multiplayer is not the current target.
-

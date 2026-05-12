@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "setup:local": "node scripts/setup-local.mjs",
+    "agent:state": "node scripts/set-agent-state.mjs",
     "predev": "node scripts/setup-local.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
