@@ -228,6 +228,16 @@
           );
           pass("local decoration replacement persisted without purchase flow");
 
+          clickScenePoint(win, doc, { x: 0.53, y: 0.69 });
+          await waitFor(
+            win,
+            () => Boolean(savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.placement),
+            "Local furniture placement did not persist",
+          );
+          const moved = savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.placement;
+          assert(Number.isFinite(Number(moved?.x)) && Number.isFinite(Number(moved?.y)), "Persisted placement should include numeric x/y");
+          pass("local decoration placement persisted");
+
           const warmBundleButton = themeBundleButton(doc, "warmStarter");
           assert(Boolean(warmBundleButton), "Warm starter theme bundle action was not rendered");
           click(win, warmBundleButton);

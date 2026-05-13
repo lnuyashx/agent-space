@@ -222,6 +222,7 @@ const el = {
   decorateSlotList: document.querySelector("#decorateSlotList"),
   decorateItemList: document.querySelector("#decorateItemList"),
   decorateCurrentSlot: document.querySelector("#decorateCurrentSlot"),
+  decoratePlacementTools: document.querySelector("#decoratePlacementTools"),
   themeCurrentLabel: document.querySelector("#themeCurrentLabel"),
   themeList: document.querySelector("#themeList"),
   saveSchemaLabel: document.querySelector("#saveSchemaLabel"),
@@ -300,6 +301,16 @@ function applySavedSceneSnapshot(sceneSnapshot) {
         if (!zone || !item || !item.slots?.includes(zone.slot)) return;
         zone.itemId = objectSave.itemId;
         zone.label = item.label;
+        if (objectSave?.placement && typeof objectSave.placement === "object") {
+          const placement = normalizePlacementRect(objectSave.placement);
+          if (placement) {
+            zone.placementRect = placement;
+            zone.customInteractionPoint = nearestWalkablePoint({
+              x: placement.x + placement.w / 2,
+              y: placement.y + placement.h,
+            }, scene);
+          }
+        }
       });
     }
     if (Array.isArray(sceneSave.ownedThemeIds)) {
@@ -488,7 +499,13 @@ function buildSceneSnapshot() {
           ? Array.from(new Set(scene.ownedBundleIds.filter((bundleId) => canUseBundleInScene(bundleId, sceneId))))
           : [],
         placedObjects: Object.fromEntries(
-          Object.entries(scene.zones).map(([objectId, zone]) => [objectId, { itemId: zone.itemId }]),
+          Object.entries(scene.zones).map(([objectId, zone]) => [
+            objectId,
+            {
+              itemId: zone.itemId,
+              ...(zone.placementRect ? { placement: cloneData(zone.placementRect) } : {}),
+            },
+          ]),
         ),
       },
     ]),
@@ -668,7 +685,7 @@ function currentPetFrame(timeMs = Date.now()) {
 
 function activeSceneImage() {
   const scene = activeScene();
-  const decoratingImage = state.decorating ? scene.decoratingImage : null;
+  const decoratingImage = state.decorating || sceneHasDecorOverrides(scene) ? scene.decoratingImage : null;
   if (decoratingImage?.complete && decoratingImage.naturalWidth) return decoratingImage;
   return scene.image;
 }
@@ -740,7 +757,24 @@ function pointInEllipse(point, ellipse) {
   return ((point.x - cx) ** 2) / (rx ** 2) + ((point.y - cy) ** 2) / (ry ** 2) <= 1;
 }
 
+function normalizePlacementRect(value) {
+  const x = Number(value?.x);
+  const y = Number(value?.y);
+  const w = Number(value?.w);
+  const h = Number(value?.h);
+  if (![x, y, w, h].every(Number.isFinite)) return null;
+  const width = clamp(w, 0.035, 0.36);
+  const height = clamp(h, 0.035, 0.32);
+  return {
+    x: clamp(x, 0, 1 - width),
+    y: clamp(y, 0, 1 - height),
+    w: width,
+    h: height,
+  };
+}
+
 function zoneShapes(zone) {
+  if (zone.placementRect) return [{ type: "rect", ...zone.placementRect }];
   if (zone.hitAreas) return zone.hitAreas;
   if (zone.polygon) return [{ type: "polygon", points: zone.polygon }];
   if (zone.rect) return [{ type: "rect", ...zone.rect }];
@@ -818,6 +852,10 @@ function decoratableObjects(scene = activeScene()) {
   return Object.entries(scene.zones).filter(([, zone]) => zoneSupportsAction(zone, "decorate_replace"));
 }
 
+function sceneHasDecorOverrides(scene = activeScene()) {
+  return decoratableObjects(scene).some(([, zone]) => zone.itemId !== zone.defaultItemId || Boolean(zone.placementRect));
+}
+
 function catalogItemsForSlot(slot) {
   return Object.entries(gameData.itemCatalog).filter(([itemId, item]) => item.slots?.includes(slot) && item.actions?.includes("decorate_replace"));
 }
@@ -886,6 +924,7 @@ function nearestWalkablePoint(point, scene = activeScene()) {
 }
 
 function zoneInteractionPoint(zone, scene = activeScene()) {
+  if (zone.customInteractionPoint) return nearestWalkablePoint(zone.customInteractionPoint, scene);
   if (zone.interactionPoint) return nearestWalkablePoint(zone.interactionPoint, scene);
   if (zone.point) return nearestWalkablePoint(zone.point, scene);
   const bounds = zoneBounds(zone);
@@ -1042,10 +1081,11 @@ function drawThemeOverlay(theme, rect) {
 
 function drawObjectLayer() {
   const time = performance.now();
+  const customDecorView = state.decorating || sceneHasDecorOverrides();
   decoratableObjects().forEach(([objectId, zone]) => {
-    const changed = zone.itemId !== zone.defaultItemId;
+    const changed = zone.itemId !== zone.defaultItemId || Boolean(zone.placementRect);
     const selected = state.decorating && state.selectedDecorObjectId === objectId;
-    if (!state.decorating && !changed) return;
+    if (!customDecorView && !changed) return;
     drawPixelFurniture(zone, itemForZone(zone), {
       changed,
       selected,
@@ -1713,6 +1753,19 @@ function renderThemeList() {
   });
 }
 
+function renderPlacementTools(zone) {
+  if (!el.decoratePlacementTools) return;
+  if (!zone) {
+    el.decoratePlacementTools.innerHTML = "";
+    return;
+  }
+  const hasPlacement = Boolean(zone.placementRect);
+  el.decoratePlacementTools.innerHTML = `
+    <small>${hasPlacement ? "已使用自定义位置；点击房间空地可继续移动" : "点击房间空地可移动当前家具位置"}</small>
+    <button type="button" data-placement-reset ${hasPlacement ? "" : "disabled"}>重置位置</button>
+  `;
+}
+
 function renderDecoratePanel() {
   if (!el.decorateDrawer) return;
   const slots = decoratableObjects();
@@ -1721,6 +1774,7 @@ function renderDecoratePanel() {
     el.decorateSlotList.innerHTML = '<div class="decor-card"><strong>当前场景暂无可替换槽位</strong><span>先回到室内试试</span></div>';
     el.decorateItemList.innerHTML = "";
     el.decorateCurrentSlot.textContent = "无可用槽位";
+    renderPlacementTools(null);
     renderThemeList();
     return;
   }
@@ -1745,6 +1799,7 @@ function renderDecoratePanel() {
   const selected = activeScene().zones[state.selectedDecorObjectId];
   const selectedItem = itemForZone(selected);
   el.decorateCurrentSlot.textContent = selected ? `${selected.slot} · ${selectedItem?.label || selected.label}` : "选择槽位";
+  renderPlacementTools(selected);
   el.decorateItemList.innerHTML = "";
   catalogItemsForSlot(selected.slot).forEach(([itemId, item]) => {
     const owned = ownedCount(itemId);
@@ -1782,6 +1837,42 @@ function closeDecoratePanel() {
   state.hoverZone = null;
   el.decorateDrawer.classList.remove("open");
   el.decorateDrawer.setAttribute("aria-hidden", "true");
+}
+
+async function moveSelectedDecorObjectTo(point) {
+  const zone = activeScene().zones[state.selectedDecorObjectId];
+  if (!state.decorating || !zone || !zoneSupportsAction(zone, "decorate_replace")) return false;
+  const bounds = zoneBounds(zone);
+  const width = clamp(bounds.w || 0.1, 0.05, 0.28);
+  const height = clamp(bounds.h || 0.08, 0.05, 0.26);
+  zone.placementRect = normalizePlacementRect({
+    x: point.x - width / 2,
+    y: point.y - height / 2,
+    w: width,
+    h: height,
+  });
+  zone.customInteractionPoint = nearestWalkablePoint({
+    x: zone.placementRect.x + zone.placementRect.w / 2,
+    y: zone.placementRect.y + zone.placementRect.h,
+  });
+  state.hoverZone = zone;
+  state.hotspotPulse = { zone, until: Date.now() + 900 };
+  await saveGameState();
+  renderDecoratePanel();
+  toast(`${zone.slot} 已移动`);
+  return true;
+}
+
+async function resetSelectedDecorPlacement() {
+  const zone = activeScene().zones[state.selectedDecorObjectId];
+  if (!zone?.placementRect) return;
+  delete zone.placementRect;
+  delete zone.customInteractionPoint;
+  state.hoverZone = zone;
+  state.hotspotPulse = { zone, until: Date.now() + 900 };
+  await saveGameState();
+  renderDecoratePanel();
+  toast(`${zone.slot} 已恢复默认位置`);
 }
 
 async function replaceDecorItem(itemId) {
@@ -2765,6 +2856,10 @@ canvas.addEventListener("click", (event) => {
   }
   const zone = zoneAt(scenePoint);
   if (!zone) {
+    if (state.decorating) {
+      void moveSelectedDecorObjectTo(scenePoint);
+      return;
+    }
     handleGroundClick(scenePoint);
     return;
   }
@@ -2788,7 +2883,7 @@ canvas.addEventListener("click", (event) => {
 canvas.addEventListener("mousemove", (event) => {
   const rect = canvas.getBoundingClientRect();
   state.hoverZone = zoneAt(canvasToScene({ x: event.clientX - rect.left, y: event.clientY - rect.top }));
-  canvas.style.cursor = state.hoverZone ? "pointer" : "default";
+  canvas.style.cursor = state.hoverZone ? "pointer" : state.decorating ? "copy" : "default";
 });
 
 canvas.addEventListener("mouseleave", () => {
@@ -2849,6 +2944,12 @@ el.localStateControls?.addEventListener("click", (event) => {
   if (button.dataset.localAgentStatus) {
     previewLocalAgentStatus(button.dataset.localAgentStatus);
   }
+});
+
+el.decoratePlacementTools?.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-placement-reset]");
+  if (!button || button.disabled) return;
+  void resetSelectedDecorPlacement();
 });
 
 el.modeBtn.addEventListener("click", () => {

@@ -582,6 +582,31 @@ button:hover {
   font-size: 12px;
 }
 
+.placement-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  margin: -2px 0 10px;
+}
+
+.placement-tools small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.placement-tools button {
+  min-height: 30px;
+  padding: 0 10px;
+  border-style: dashed;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .theme-entry {
   display: grid;
   gap: 6px;

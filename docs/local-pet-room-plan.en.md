@@ -11,6 +11,7 @@ It must deliver:
 - First-start import of local Codex pet visual assets.
 - A pet rendered in the room, with animation and behavior anchors driven by abstract agent state.
 - Local room background, theme bundle, and individual furniture switching.
+- First local placement pass for the selected furniture item in decoration mode, persisted as `placement`.
 - Local persistence across refresh.
 - No coin purchase flow, real shop, payment, account system, or multiplayer.
 
