@@ -49,11 +49,21 @@ export interface AgentSpaceItem {
 
 export interface AgentSpaceScene {
   assetId: string;
+  decoratingAssetId?: string;
+  backgroundOptions?: AgentSpaceRoomBackground[];
   status: string;
   hash: string;
   entry: AgentSpacePoint;
   placedObjects: Record<string, AgentSpacePlacedObject>;
   walkableRects: AgentSpaceRect[];
+}
+
+export interface AgentSpaceRoomBackground {
+  id: string;
+  label: string;
+  assetId: string;
+  decoratingAssetId?: string;
+  description?: string;
 }
 
 export interface AgentSpaceAgent {

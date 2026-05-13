@@ -6,6 +6,43 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
     "label": "室内",
     "assetId": "indoor",
     "decoratingAssetId": "indoorEmptyPrototype",
+    "backgroundOptions": [
+      {
+        "id": "fullHome",
+        "label": "全屋晨光",
+        "assetId": "indoor",
+        "decoratingAssetId": "indoorEmptyPrototype",
+        "description": "默认四区大房间"
+      },
+      {
+        "id": "focusStudy",
+        "label": "书房专注",
+        "assetId": "indoorStudy",
+        "decoratingAssetId": "indoorStudy",
+        "description": "专注状态背景"
+      },
+      {
+        "id": "sleepBedroom",
+        "label": "暖光卧室",
+        "assetId": "indoorBedroom",
+        "decoratingAssetId": "indoorBedroom",
+        "description": "休息放松背景"
+      },
+      {
+        "id": "cozyKitchen",
+        "label": "生活厨房",
+        "assetId": "indoorKitchen",
+        "decoratingAssetId": "indoorKitchen",
+        "description": "生活感背景"
+      },
+      {
+        "id": "makerStudio",
+        "label": "创作工作室",
+        "assetId": "indoorStudio",
+        "decoratingAssetId": "indoorStudio",
+        "description": "工具创作背景"
+      }
+    ],
     "entry": {
       "x": 0.43,
       "y": 0.55

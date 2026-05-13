@@ -39,8 +39,8 @@ This PixiJS entry is the first stage of the production renderer. Backgrounds, ob
 - Ground click movement with walkable snapping.
 - Walking animation with facing flip, bob, target marker, and easing.
 - Conversation-driven work/rest states.
-- Slot-based decoration drawer with locally unlocked themes and furniture.
-- Browser `localStorage` save for theme, placed furniture, and local placement state, with old coin fields kept only for compatibility.
+- Slot-based decoration drawer with locally unlocked backgrounds, themes, and furniture.
+- Browser `localStorage` save for background, theme, placed furniture, and local placement state, with old coin fields kept only for compatibility.
 - Local pet runtime through `scripts/setup-local.mjs`, `pet-manifest.json`, and `agent-state.json`.
 - Local state debug flow through `npm run agent:state -- coding`, plus in-drawer status preview buttons for room behavior mapping.
 - PixiJS renderer foundation in `src/pixi/pixi-foundation.ts`.

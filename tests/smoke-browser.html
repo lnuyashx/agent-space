@@ -135,6 +135,10 @@
         return doc.querySelector(`#themeList .theme-bundle-button[data-theme-id="${themeId}"]`);
       }
 
+      function backgroundButton(doc, backgroundId) {
+        return doc.querySelector(`#backgroundList .background-card[data-background-id="${backgroundId}"]`);
+      }
+
       function setComposer(doc, mode, value) {
         doc.querySelector("#intentSelect").value = mode;
         doc.querySelector("#promptInput").value = value;
@@ -207,6 +211,18 @@
           );
           pass("local agent state preview updated room behavior");
 
+          const studyBackgroundButton = backgroundButton(doc, "focusStudy");
+          assert(Boolean(studyBackgroundButton), "Focus study background option was not rendered");
+          click(win, studyBackgroundButton);
+          await waitFor(
+            win,
+            () => savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.backgroundId === "focusStudy",
+            "Local room background switch did not persist",
+          );
+          assert(text(doc, "#backgroundCurrentLabel").includes("书房专注"), "Background label did not reflect selected room background");
+          assert(text(doc, "#roomSummaryMeta").includes("背景 书房专注"), "Room summary did not reflect selected room background");
+          pass("local room background switch persisted");
+
           const lavenderButton = itemButton(doc, "薰衣草云床");
           assert(Boolean(lavenderButton), "Local decoration item 薰衣草云床 was not listed");
           assert(lavenderButton.textContent.includes("本地可用"), "Local decoration item was not marked as locally available");
@@ -243,10 +259,11 @@
           await waitFor(
             win,
             () => {
-              const next = savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed;
-              return next?.itemId === "bed_pink_basic" && !next.placement;
+              const nextScene = savedPayload(win.localStorage)?.sceneSnapshot?.indoor;
+              const nextBed = nextScene?.placedObjects?.bedroomBed;
+              return nextBed?.itemId === "bed_pink_basic" && !nextBed.placement && nextScene?.backgroundId === "fullHome";
             },
-            "Room reset did not restore default furniture and placement",
+            "Room reset did not restore default background, furniture, and placement",
           );
           pass("room customization reset restored defaults");
 

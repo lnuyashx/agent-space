@@ -29,6 +29,10 @@ window.AGENT_SPACE_DATA_MODULES.assets = {
   "scenes": {
     "indoor": "./assets/scene-indoor-v2.png",
     "indoorEmptyPrototype": "./assets/scene-indoor-empty-prototype.svg",
+    "indoorStudy": "./assets/scene-study.png",
+    "indoorBedroom": "./assets/scene-bedroom.png",
+    "indoorKitchen": "./assets/scene-kitchen.png",
+    "indoorStudio": "./assets/scene-studio.png",
     "yard": "./assets/scene-yard.png"
   },
   "atlases": {

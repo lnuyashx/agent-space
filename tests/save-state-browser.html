@@ -90,6 +90,7 @@
               },
               sceneSnapshot: {
                 indoor: {
+                  backgroundId: "focusStudy",
                   placedObjects: {
                     bedroomBed: { itemId: "bed_blue_ocean" },
                   },
@@ -123,6 +124,7 @@
             Boolean(saved.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId),
             "saved payload should include indoor placed object item ids",
           );
+          assert(saved.sceneSnapshot?.indoor?.backgroundId === "focusStudy", "saved payload should include indoor background id");
           assert(!window.localStorage.getItem(LEGACY_SAVE_KEY), "legacy save key should be removed after new save");
           assert(doc.querySelector("#saveDebugMeta")?.textContent.includes("已保存"), "debug meta should reflect saved status");
 

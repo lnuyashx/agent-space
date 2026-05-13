@@ -114,15 +114,27 @@ const sceneZones = Object.fromEntries(
 );
 
 const scenes = Object.fromEntries(
-  Object.entries(gameData.scenes).map(([sceneId, scene]) => [
-    sceneId,
-    {
-      ...scene,
-      image: sceneImages[scene.assetId],
-      decoratingImage: scene.decoratingAssetId ? sceneImages[scene.decoratingAssetId] : null,
-      zones: scene.placedObjects,
-    },
-  ]),
+  Object.entries(gameData.scenes).map(([sceneId, scene]) => {
+    const backgroundOptions = Array.isArray(scene.backgroundOptions) ? scene.backgroundOptions : [];
+    const defaultBackground = backgroundOptions[0] || {
+      id: scene.assetId,
+      label: scene.label,
+      assetId: scene.assetId,
+      decoratingAssetId: scene.decoratingAssetId,
+    };
+    return [
+      sceneId,
+      {
+        ...scene,
+        backgroundOptions,
+        backgroundId: scene.backgroundId || defaultBackground.id,
+        defaultBackgroundId: defaultBackground.id,
+        image: sceneImages[scene.assetId],
+        decoratingImage: scene.decoratingAssetId ? sceneImages[scene.decoratingAssetId] : null,
+        zones: scene.placedObjects,
+      },
+    ];
+  }),
 );
 
 applySavedInventory(savedState.inventory);
@@ -229,6 +241,8 @@ const el = {
   roomSummaryTitle: document.querySelector("#roomSummaryTitle"),
   roomSummaryMeta: document.querySelector("#roomSummaryMeta"),
   resetRoomBtn: document.querySelector("#resetRoomBtn"),
+  backgroundCurrentLabel: document.querySelector("#backgroundCurrentLabel"),
+  backgroundList: document.querySelector("#backgroundList"),
   saveSchemaLabel: document.querySelector("#saveSchemaLabel"),
   saveDebugMeta: document.querySelector("#saveDebugMeta"),
   resetSaveBtn: document.querySelector("#resetSaveBtn"),
@@ -326,6 +340,12 @@ function applySavedSceneSnapshot(sceneSnapshot) {
     if (typeof sceneSave.themeId === "string" && canUseThemeInScene(sceneSave.themeId, sceneId)) {
       scene.themeId = sceneSave.themeId;
     }
+    if (typeof sceneSave.backgroundId === "string" && canUseBackgroundInScene(sceneSave.backgroundId, sceneId)) {
+      scene.backgroundId = sceneSave.backgroundId;
+    }
+    if (!canUseBackgroundInScene(scene.backgroundId, sceneId)) {
+      scene.backgroundId = defaultBackgroundIdForScene(scene);
+    }
     if (!Array.isArray(scene.ownedThemeIds) || !scene.ownedThemeIds.length) {
       scene.ownedThemeIds = [defaultThemeIdForScene(sceneId)].filter(Boolean);
     }
@@ -337,6 +357,26 @@ function applySavedSceneSnapshot(sceneSnapshot) {
     const inferredBundleIds = inferBundleOwnershipFromThemes(sceneId, scene.ownedThemeIds);
     scene.ownedBundleIds = Array.from(new Set([...validSavedBundleIds, ...inferredBundleIds]));
   });
+}
+
+function backgroundOptionsForScene(scene = activeScene()) {
+  return Array.isArray(scene?.backgroundOptions) ? scene.backgroundOptions : [];
+}
+
+function defaultBackgroundIdForScene(scene = activeScene()) {
+  const options = backgroundOptionsForScene(scene);
+  return scene?.defaultBackgroundId || options[0]?.id || scene?.assetId || null;
+}
+
+function canUseBackgroundInScene(backgroundId, sceneId) {
+  const scene = scenes[sceneId];
+  return backgroundOptionsForScene(scene).some((option) => option.id === backgroundId);
+}
+
+function sceneBackground(scene = activeScene()) {
+  const options = backgroundOptionsForScene(scene);
+  if (!options.length) return null;
+  return options.find((option) => option.id === scene.backgroundId) || options[0];
 }
 
 function themesForScene(sceneId) {
@@ -498,6 +538,7 @@ function buildSceneSnapshot() {
       sceneId,
       {
         themeId: scene.themeId || defaultThemeIdForScene(sceneId),
+        backgroundId: scene.backgroundId || defaultBackgroundIdForScene(scene),
         ownedThemeIds: Array.isArray(scene.ownedThemeIds) ? Array.from(new Set(scene.ownedThemeIds)) : [],
         ownedBundleIds: Array.isArray(scene.ownedBundleIds)
           ? Array.from(new Set(scene.ownedBundleIds.filter((bundleId) => canUseBundleInScene(bundleId, sceneId))))
@@ -687,10 +728,19 @@ function currentPetFrame(timeMs = Date.now()) {
   return petFrameForAnimation(animationKey, timeMs);
 }
 
+function backgroundAssetIdForScene(scene = activeScene()) {
+  const background = sceneBackground(scene);
+  if (!background) return scene.assetId;
+  const useDecoratingImage = state.decorating || sceneHasDecorOverrides(scene);
+  return useDecoratingImage
+    ? background.decoratingAssetId || scene.decoratingAssetId || background.assetId
+    : background.assetId;
+}
+
 function activeSceneImage() {
   const scene = activeScene();
-  const decoratingImage = state.decorating || sceneHasDecorOverrides(scene) ? scene.decoratingImage : null;
-  if (decoratingImage?.complete && decoratingImage.naturalWidth) return decoratingImage;
+  const backgroundImage = sceneImages[backgroundAssetIdForScene(scene)];
+  if (backgroundImage?.complete && backgroundImage.naturalWidth) return backgroundImage;
   return scene.image;
 }
 
@@ -1508,6 +1558,16 @@ function themeCommerceText(theme, owned, equipped) {
   return price > 0 ? `${theme.rarity} · ${price} 金币` : `${theme.rarity} · 免费`;
 }
 
+function backgroundThumbnailMarkup(background) {
+  const src = gameData.assets.scenes?.[background?.assetId] || "";
+  return `<span class="background-thumb" style="background-image:url('${src}')"></span>`;
+}
+
+function backgroundStatusText(background, equipped) {
+  if (equipped) return "当前背景";
+  return background?.description || "本地可用";
+}
+
 function themeBundlesForScene(themeId, sceneId) {
   const bundles = gameData.themeBundles?.bundles || {};
   const theme = gameData.themeBundles?.themes?.[themeId];
@@ -1692,6 +1752,50 @@ async function applyThemeBundle(themeId) {
   }
 }
 
+async function equipSceneBackground(backgroundId) {
+  const scene = activeScene();
+  if (!scene || !canUseBackgroundInScene(backgroundId, state.currentScene)) return;
+  const background = backgroundOptionsForScene(scene).find((option) => option.id === backgroundId);
+  if (!background) return;
+  if (scene.backgroundId === backgroundId) {
+    toast(`${background.label} 已经是当前背景`);
+    return;
+  }
+  scene.backgroundId = backgroundId;
+  await saveGameState();
+  renderDecoratePanel();
+  renderStatus();
+  toast(`已切换到 ${background.label}`);
+}
+
+function renderBackgroundList() {
+  if (!el.backgroundList || !el.backgroundCurrentLabel) return;
+  const scene = activeScene();
+  const backgrounds = backgroundOptionsForScene(scene);
+  const currentBackground = sceneBackground(scene);
+  el.backgroundList.innerHTML = "";
+
+  if (!backgrounds.length) {
+    el.backgroundCurrentLabel.textContent = "房间背景";
+    el.backgroundList.innerHTML = '<div class="decor-card"><strong>当前场景暂无可替换背景</strong><span>后续开放</span></div>';
+    return;
+  }
+
+  el.backgroundCurrentLabel.textContent = currentBackground ? `房间背景 · ${currentBackground.label}` : "房间背景";
+  backgrounds.forEach((background) => {
+    const equipped = scene.backgroundId === background.id;
+    const button = document.createElement("button");
+    button.className = `background-card${equipped ? " active" : ""}`;
+    button.type = "button";
+    button.dataset.backgroundId = background.id;
+    button.innerHTML = `${backgroundThumbnailMarkup(background)}<span class="decor-copy"><strong>${background.label}</strong><span>${backgroundStatusText(background, equipped)}</span></span>`;
+    button.addEventListener("click", () => {
+      void equipSceneBackground(background.id);
+    });
+    el.backgroundList.append(button);
+  });
+}
+
 function renderThemeList() {
   if (!el.themeList || !el.themeCurrentLabel) return;
   const themes = themesForScene(state.currentScene);
@@ -1776,21 +1880,25 @@ function roomCustomizationStats(scene = activeScene()) {
   const movedFurniture = slots.filter(([, zone]) => Boolean(zone.placementRect)).length;
   const total = slots.length;
   const theme = sceneTheme(scene);
+  const background = sceneBackground(scene);
   const defaultThemeId = defaultThemeIdForScene(state.currentScene);
+  const defaultBackgroundId = defaultBackgroundIdForScene(scene);
   const themeChanged = Boolean(scene.themeId && scene.themeId !== defaultThemeId);
-  return { theme, changedFurniture, movedFurniture, total, themeChanged };
+  const backgroundChanged = Boolean(scene.backgroundId && scene.backgroundId !== defaultBackgroundId);
+  return { theme, background, changedFurniture, movedFurniture, total, themeChanged, backgroundChanged };
 }
 
 function renderRoomSummary() {
   if (!el.roomSummaryTitle || !el.roomSummaryMeta || !el.resetRoomBtn) return;
   const stats = roomCustomizationStats();
-  el.roomSummaryTitle.textContent = stats.theme ? stats.theme.label : activeScene().label;
+  el.roomSummaryTitle.textContent = stats.background ? stats.background.label : activeScene().label;
   const detail = [];
+  detail.push(stats.backgroundChanged ? `背景 ${stats.background.label}` : "默认背景");
   detail.push(stats.themeChanged ? "主题已调整" : "默认主题");
   detail.push(`${stats.changedFurniture}/${stats.total} 件替换`);
   detail.push(`${stats.movedFurniture} 件移动`);
   el.roomSummaryMeta.textContent = detail.join(" · ");
-  el.resetRoomBtn.disabled = !stats.themeChanged && stats.changedFurniture === 0 && stats.movedFurniture === 0;
+  el.resetRoomBtn.disabled = !stats.backgroundChanged && !stats.themeChanged && stats.changedFurniture === 0 && stats.movedFurniture === 0;
 }
 
 function renderDecoratePanel() {
@@ -1803,6 +1911,7 @@ function renderDecoratePanel() {
     el.decorateCurrentSlot.textContent = "无可用槽位";
     renderPlacementTools(null);
     renderRoomSummary();
+    renderBackgroundList();
     renderThemeList();
     return;
   }
@@ -1848,6 +1957,7 @@ function renderDecoratePanel() {
     el.decorateItemList.append(button);
   });
   renderRoomSummary();
+  renderBackgroundList();
   renderThemeList();
 }
 
@@ -1910,6 +2020,10 @@ async function resetRoomCustomization() {
   if (defaultThemeId) {
     scene.themeId = defaultThemeId;
     scene.ownedThemeIds = Array.from(new Set([...(scene.ownedThemeIds || []), defaultThemeId]));
+  }
+  const defaultBackgroundId = defaultBackgroundIdForScene(scene);
+  if (defaultBackgroundId) {
+    scene.backgroundId = defaultBackgroundId;
   }
   decoratableObjects(scene).forEach(([, zone]) => {
     zone.itemId = zone.defaultItemId;
