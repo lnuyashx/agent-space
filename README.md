@@ -41,7 +41,7 @@ http://127.0.0.1:5173/?renderer=pixi
 - 走路表现：移动时有朝向翻转、上下步幅、落点光标和缓动动画
 - 会话驱动状态：真实工作/休息由底部会话框触发，agent 自动移动到对应区域
 - 装修 / 本地全解锁雏形：点击「设置」打开槽位式装修抽屉；第一阶段房间背景、本地家具和主题可直接切换，不做金币购买
-- 临时对象层：装修模式和自定义房间会切到空房间 prototype 背景，再按 `itemCatalog[itemId].sprite` 绘制独立家具；正式版会换成真实 sprite atlas 和生产级空房间底图
+- 临时对象层：默认大房间在装修模式和自定义家具时会切到空房间 prototype 背景，其他背景保持所选底图，再按 `itemCatalog[itemId].sprite` 绘制独立家具；正式版会换成真实 sprite atlas 和生产级空房间底图
 - 本地快照：房间背景、已摆放家具、主题、家具位置和开发期兼容字段会按 `schemaVersion` 写入浏览器 `localStorage`，刷新后保留；设置抽屉里可查看存档状态并重置本地存档
 - 本地 pet runtime：`scripts/setup-local.mjs` 会导入当前机器的 Codex pet 视觉资产，并创建 `agent-state.json` 作为第一阶段状态同步入口
 - 本地状态调试：`npm run agent:state -- coding` 会写入状态文件；设置抽屉里的 Agent 状态按钮可快速预览房间行为映射
