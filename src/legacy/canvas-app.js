@@ -131,6 +131,7 @@ Object.values(scenes).forEach((scene) => {
   Object.entries(scene.zones).forEach(([objectId, zone]) => {
     zone.objectId = objectId;
     zone.defaultItemId = zone.defaultItemId || zone.itemId;
+    zone.defaultLabel = zone.defaultLabel || zone.label;
   });
 });
 applyDefaultSceneThemes();
@@ -225,6 +226,9 @@ const el = {
   decoratePlacementTools: document.querySelector("#decoratePlacementTools"),
   themeCurrentLabel: document.querySelector("#themeCurrentLabel"),
   themeList: document.querySelector("#themeList"),
+  roomSummaryTitle: document.querySelector("#roomSummaryTitle"),
+  roomSummaryMeta: document.querySelector("#roomSummaryMeta"),
+  resetRoomBtn: document.querySelector("#resetRoomBtn"),
   saveSchemaLabel: document.querySelector("#saveSchemaLabel"),
   saveDebugMeta: document.querySelector("#saveDebugMeta"),
   resetSaveBtn: document.querySelector("#resetSaveBtn"),
@@ -1766,6 +1770,29 @@ function renderPlacementTools(zone) {
   `;
 }
 
+function roomCustomizationStats(scene = activeScene()) {
+  const slots = decoratableObjects(scene);
+  const changedFurniture = slots.filter(([, zone]) => zone.itemId !== zone.defaultItemId).length;
+  const movedFurniture = slots.filter(([, zone]) => Boolean(zone.placementRect)).length;
+  const total = slots.length;
+  const theme = sceneTheme(scene);
+  const defaultThemeId = defaultThemeIdForScene(state.currentScene);
+  const themeChanged = Boolean(scene.themeId && scene.themeId !== defaultThemeId);
+  return { theme, changedFurniture, movedFurniture, total, themeChanged };
+}
+
+function renderRoomSummary() {
+  if (!el.roomSummaryTitle || !el.roomSummaryMeta || !el.resetRoomBtn) return;
+  const stats = roomCustomizationStats();
+  el.roomSummaryTitle.textContent = stats.theme ? stats.theme.label : activeScene().label;
+  const detail = [];
+  detail.push(stats.themeChanged ? "主题已调整" : "默认主题");
+  detail.push(`${stats.changedFurniture}/${stats.total} 件替换`);
+  detail.push(`${stats.movedFurniture} 件移动`);
+  el.roomSummaryMeta.textContent = detail.join(" · ");
+  el.resetRoomBtn.disabled = !stats.themeChanged && stats.changedFurniture === 0 && stats.movedFurniture === 0;
+}
+
 function renderDecoratePanel() {
   if (!el.decorateDrawer) return;
   const slots = decoratableObjects();
@@ -1775,6 +1802,7 @@ function renderDecoratePanel() {
     el.decorateItemList.innerHTML = "";
     el.decorateCurrentSlot.textContent = "无可用槽位";
     renderPlacementTools(null);
+    renderRoomSummary();
     renderThemeList();
     return;
   }
@@ -1819,6 +1847,7 @@ function renderDecoratePanel() {
     });
     el.decorateItemList.append(button);
   });
+  renderRoomSummary();
   renderThemeList();
 }
 
@@ -1873,6 +1902,27 @@ async function resetSelectedDecorPlacement() {
   await saveGameState();
   renderDecoratePanel();
   toast(`${zone.slot} 已恢复默认位置`);
+}
+
+async function resetRoomCustomization() {
+  const scene = activeScene();
+  const defaultThemeId = defaultThemeIdForScene(state.currentScene);
+  if (defaultThemeId) {
+    scene.themeId = defaultThemeId;
+    scene.ownedThemeIds = Array.from(new Set([...(scene.ownedThemeIds || []), defaultThemeId]));
+  }
+  decoratableObjects(scene).forEach(([, zone]) => {
+    zone.itemId = zone.defaultItemId;
+    const item = itemForZone(zone);
+    zone.label = item?.label || zone.defaultLabel;
+    delete zone.placementRect;
+    delete zone.customInteractionPoint;
+  });
+  state.hoverZone = null;
+  await saveGameState();
+  renderDecoratePanel();
+  renderStatus();
+  toast("房间已恢复默认");
 }
 
 async function replaceDecorItem(itemId) {
@@ -2950,6 +3000,11 @@ el.decoratePlacementTools?.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-placement-reset]");
   if (!button || button.disabled) return;
   void resetSelectedDecorPlacement();
+});
+
+el.resetRoomBtn?.addEventListener("click", () => {
+  if (el.resetRoomBtn.disabled) return;
+  void resetRoomCustomization();
 });
 
 el.modeBtn.addEventListener("click", () => {

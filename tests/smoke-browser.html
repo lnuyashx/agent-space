@@ -236,7 +236,19 @@
           );
           const moved = savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.placement;
           assert(Number.isFinite(Number(moved?.x)) && Number.isFinite(Number(moved?.y)), "Persisted placement should include numeric x/y");
+          assert(text(doc, "#roomSummaryMeta").includes("1 件移动"), "Room summary did not reflect moved furniture");
           pass("local decoration placement persisted");
+
+          click(win, doc.querySelector("#resetRoomBtn"));
+          await waitFor(
+            win,
+            () => {
+              const next = savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed;
+              return next?.itemId === "bed_pink_basic" && !next.placement;
+            },
+            "Room reset did not restore default furniture and placement",
+          );
+          pass("room customization reset restored defaults");
 
           const warmBundleButton = themeBundleButton(doc, "warmStarter");
           assert(Boolean(warmBundleButton), "Warm starter theme bundle action was not rendered");
@@ -245,7 +257,10 @@
             win,
             () => {
               const next = savedPayload(win.localStorage);
-              return next?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_pink_basic";
+              return (
+                next?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_pink_basic" &&
+                doc.querySelector('[data-bundle-id="oceanFocusBundle"]')?.disabled === false
+              );
             },
             "Theme bundle apply did not persist warm starter equipPlan",
           );
