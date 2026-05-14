@@ -933,8 +933,29 @@ function frameForSprite(sprite) {
   return atlas?.frames?.[sprite.spriteId] || null;
 }
 
-function swatchMarkup(item) {
-  const visual = itemSprite(item).fallback;
+function atlasFrameStyle(atlas, frame) {
+  if (!atlas?.image || !frame) return "";
+  const imageSize = atlas.imageSize || atlas.frameSize || { w: frame.w, h: frame.h };
+  const sizeX = imageSize.w && frame.w ? (imageSize.w / frame.w) * 100 : 100;
+  const sizeY = imageSize.h && frame.h ? (imageSize.h / frame.h) * 100 : 100;
+  const positionX = imageSize.w === frame.w ? 0 : (frame.x / (imageSize.w - frame.w)) * 100;
+  const positionY = imageSize.h === frame.h ? 0 : (frame.y / (imageSize.h - frame.h)) * 100;
+  return [
+    `background-image:url('${atlas.image}')`,
+    `background-size:${sizeX}% ${sizeY}%`,
+    `background-position:${positionX}% ${positionY}%`,
+  ].join("; ");
+}
+
+function itemThumbMarkup(item) {
+  const sprite = itemSprite(item);
+  const visual = sprite.fallback;
+  const atlas = atlasForSprite(sprite);
+  const frame = frameForSprite(sprite);
+  const atlasStyle = atlasFrameStyle(atlas, frame);
+  if (atlasStyle) {
+    return `<span class="decor-thumb" style="${atlasStyle}; --swatch:${visual.color}; --swatch-accent:${visual.accent};"></span>`;
+  }
   return `<span class="decor-swatch" style="--swatch:${visual.color}; --swatch-accent:${visual.accent};"></span>`;
 }
 
@@ -1243,11 +1264,11 @@ function drawPixelFurniture(zone, item, options) {
   else drawGenericItemSprite(visual);
 
   if (options.changed || state.decorating) {
-    pixelRect(-25, 36, 50, 16, "rgba(255, 250, 241, .92)", "rgba(47, 33, 24, .26)");
-    ctx.fillStyle = "#2d251e";
-    ctx.font = "bold 10px ui-sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(visual.short || sprite.spriteId, 0, 47);
+    ctx.strokeStyle = options.selected ? "rgba(217, 111, 66, .78)" : "rgba(255, 247, 228, .62)";
+    ctx.lineWidth = options.selected ? 3 : 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 35, 52, 13, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -1924,7 +1945,7 @@ function renderDecoratePanel() {
     const button = document.createElement("button");
     button.className = `decor-card${state.selectedDecorObjectId === objectId ? " active" : ""}`;
     button.type = "button";
-    button.innerHTML = `${swatchMarkup(item)}<span class="decor-copy"><strong>${zone.slot}</strong><span>${item?.label || zone.label}</span></span>`;
+    button.innerHTML = `${itemThumbMarkup(item)}<span class="decor-copy"><strong>${zone.slot}</strong><span>${item?.label || zone.label}</span></span>`;
     button.addEventListener("click", () => {
       state.selectedDecorObjectId = objectId;
       state.hoverZone = zone;
@@ -1950,7 +1971,7 @@ function renderDecoratePanel() {
       unaffordable ? "unaffordable" : "",
     ].filter(Boolean).join(" ");
     button.type = "button";
-    button.innerHTML = `${swatchMarkup(item)}<span class="decor-copy"><strong>${item.label}</strong><span>${itemCommerceText(itemId, item)}</span><i class="rarity">${locked ? "SHOP" : item.rarity}</i></span>`;
+    button.innerHTML = `${itemThumbMarkup(item)}<span class="decor-copy"><strong>${item.label}</strong><span>${itemCommerceText(itemId, item)}</span><i class="rarity">${locked ? "SHOP" : item.rarity}</i></span>`;
     button.addEventListener("click", () => {
       void replaceDecorItem(itemId);
     });

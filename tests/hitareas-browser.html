@@ -298,6 +298,7 @@
           const atlas = Object.values(window.AGENT_SPACE_DATA.assets.atlases || {}).find((entry) => entry.key === item.sprite.atlasKey);
           assert(Boolean(atlas), `${itemId} points to missing atlas ${item.sprite.atlasKey}`);
           assert(Boolean(atlas.image), `${itemId} atlas ${item.sprite.atlasKey} is missing an image path`);
+          assert(Boolean(atlas.imageSize?.w && atlas.imageSize?.h), `${itemId} atlas ${item.sprite.atlasKey} is missing imageSize`);
           assert(Boolean(atlas.frames?.[item.sprite.spriteId]), `${itemId} points to missing atlas frame ${item.sprite.spriteId}`);
         });
 

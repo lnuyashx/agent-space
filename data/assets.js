@@ -39,6 +39,7 @@ window.AGENT_SPACE_DATA_MODULES.assets = {
     "furniturePrototype": {
       "key": "prototype-furniture",
       "image": "./assets/furniture-prototype-atlas.svg",
+      "imageSize": { "w": 800, "h": 480 },
       "frameSize": { "w": 160, "h": 120 },
       "frames": PROTOTYPE_ATLAS_FRAMES,
       "status": "prototype-art"

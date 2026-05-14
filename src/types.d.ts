@@ -114,6 +114,7 @@ export interface AgentSpaceRect {
 export interface AgentSpaceAtlas {
   key: string;
   image: string;
+  imageSize?: AgentSpaceFrameSize;
   frameSize?: AgentSpaceFrameSize;
   frames?: Record<string, AgentSpaceRect>;
   status?: string;
