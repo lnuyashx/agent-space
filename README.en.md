@@ -35,6 +35,7 @@ This PixiJS entry is the first stage of the production renderer. Backgrounds, ob
 - Bottom conversation dock with agent tabs, settings, and input.
 - HUD for agent status, energy, mood, and local customization state.
 - Object-body `hitAreas` for visible art objects.
+- Per-slot `renderRect` data for sprite size and 2.5D placement, separate from click hit areas.
 - Scene navigation through the door.
 - Ground click movement with walkable snapping.
 - Walking animation with facing flip, bob, target marker, and easing.

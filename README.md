@@ -88,7 +88,7 @@ http://127.0.0.1:5173/?renderer=pixi
 
 1. 背景层：常规室内使用 `scene-indoor-v2.png`，装修模式使用 `scene-indoor-empty-prototype.svg`，院子使用 `scene-yard.png`
 2. 物品层：`itemCatalog` 定义可替换/可交互物品，比如床、沙发、电脑桌、农田；当前仍保留 `price` 兼容字段，但第一阶段不做购买扣费，`assets.atlases` 提供 prototype atlas 帧表
-3. 摆放层：`placedObjects` 标注用户房间里实际摆了什么，以及对应的热区和站位
+3. 摆放层：`placedObjects` 标注用户房间里实际摆了什么，以及对应的热区、站位和 `renderRect` 家具绘制框
 4. 行走层：`walkableRects` 标注可走地面，点击空地会移动到可走点
 5. 角色层：agent 根据 `point`、`facing`、`status` 绘制和移动
 
@@ -99,6 +99,7 @@ http://127.0.0.1:5173/?renderer=pixi
 - `itemCatalog[itemId].sprite`：包含 `atlasKey`、`spriteId`、`anchor` 和当前 demo 用的 `fallback`；当前会优先从 `assets/furniture-prototype-atlas.svg` 取帧，缺图时回退到 canvas fallback
 - `decoratingAssetId`：场景在装修模式下使用的替代背景；当前室内指向空房间 prototype，方便独立家具层可视化
 - `slot`：槽位，比如 `study.desk`，V1 装修先从槽位替换开始
+- `renderRect`：家具 sprite 在 2.5D 房间里的绘制位置和尺寸；和 `hitAreas` 分离，避免点击热区影响美术摆放
 - `label`：显示名，比如“大门”
 - `type`：`preview` / `navigate` / `yard`
 - `hitAreas`：贴合实际美术物体的命中区

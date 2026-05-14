@@ -287,6 +287,14 @@
               pointInWalkable(zone.interactionPoint, scene),
               `${sceneId}.${objectId} interactionPoint is outside walkable space`,
             );
+            const item = window.AGENT_SPACE_DATA.itemCatalog[zone.itemId];
+            if (item?.actions?.includes("decorate_replace")) {
+              assert(Boolean(zone.renderRect), `${sceneId}.${objectId} is missing renderRect`);
+              ["x", "y", "w", "h"].forEach((key) => {
+                assert(Number.isFinite(Number(zone.renderRect?.[key])), `${sceneId}.${objectId}.renderRect.${key} is not finite`);
+              });
+              assert(zone.renderRect.w > 0 && zone.renderRect.h > 0, `${sceneId}.${objectId} renderRect should have positive size`);
+            }
           });
         });
 

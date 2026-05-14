@@ -91,6 +91,7 @@ export interface AgentSpacePlacedObject {
   label: string;
   point: AgentSpacePoint;
   hitAreas?: AgentSpaceShape[];
+  renderRect?: AgentSpaceRect;
   rect?: AgentSpaceRect;
   polygon?: AgentSpacePoint[];
   preview?: string;

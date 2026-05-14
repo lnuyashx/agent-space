@@ -100,6 +100,12 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
           "x": 0.19,
           "y": 0.44
         },
+        "renderRect": {
+          "x": 0.075,
+          "y": 0.165,
+          "w": 0.27,
+          "h": 0.25
+        },
         "interactionPoint": {
           "x": 0.31,
           "y": 0.49
@@ -149,6 +155,12 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
           "x": 0.34,
           "y": 0.74
         },
+        "renderRect": {
+          "x": 0.238,
+          "y": 0.594,
+          "w": 0.2,
+          "h": 0.28
+        },
         "interactionPoint": {
           "x": 0.38,
           "y": 0.67
@@ -197,6 +209,12 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
         "point": {
           "x": 0.17,
           "y": 0.6
+        },
+        "renderRect": {
+          "x": 0.025,
+          "y": 0.438,
+          "w": 0.19,
+          "h": 0.32
         },
         "interactionPoint": {
           "x": 0.22,
@@ -268,6 +286,12 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
           "x": 0.48,
           "y": 0.37
         },
+        "renderRect": {
+          "x": 0.355,
+          "y": 0.035,
+          "w": 0.22,
+          "h": 0.47
+        },
         "interactionPoint": {
           "x": 0.55,
           "y": 0.52
@@ -320,6 +344,12 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
         "point": {
           "x": 0.62,
           "y": 0.4
+        },
+        "renderRect": {
+          "x": 0.505,
+          "y": 0.245,
+          "w": 0.19,
+          "h": 0.28
         },
         "interactionPoint": {
           "x": 0.61,
@@ -503,6 +533,12 @@ window.AGENT_SPACE_DATA_MODULES.scenes = {
         "point": {
           "x": 0.74,
           "y": 0.78
+        },
+        "renderRect": {
+          "x": 0.67,
+          "y": 0.605,
+          "w": 0.28,
+          "h": 0.32
         },
         "interactionPoint": {
           "x": 0.67,

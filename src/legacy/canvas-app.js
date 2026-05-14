@@ -883,6 +883,14 @@ function zoneBounds(zone) {
   };
 }
 
+function zoneDefaultRenderRect(zone) {
+  return normalizePlacementRect(zone.renderRect) || zoneBounds(zone);
+}
+
+function zoneRenderRect(zone) {
+  return zone.placementRect || zoneDefaultRenderRect(zone);
+}
+
 function zoneAt(point) {
   return Object.values(activeScene().zones).find((zone) => pointInZone(point, zone)) || null;
 }
@@ -1234,12 +1242,12 @@ function drawPixelFurniture(zone, item, options) {
   const spriteKind = visual.kind || item?.category;
   const atlasImage = atlasImages[sprite.atlasKey];
   const atlasFrame = frameForSprite(sprite);
-  const bounds = zoneBounds(zone);
+  const bounds = zoneRenderRect(zone);
   const p1 = sceneToCanvas({ x: bounds.x, y: bounds.y });
   const p2 = sceneToCanvas({ x: bounds.x + bounds.w, y: bounds.y + bounds.h });
   const width = Math.abs(p2.x - p1.x);
   const height = Math.abs(p2.y - p1.y);
-  const scale = clamp(Math.min(width / 116, height / 78), 0.52, 1.08);
+  const scale = clamp(Math.min(width / 116, height / 96), 0.52, 2.05);
   const pulse = options.selected ? 1 + Math.sin(options.time / 150) * 0.045 : 1;
   const alpha = options.selected || options.changed ? 0.96 : options.dimmed ? 0.58 : 0.76;
 
@@ -2002,9 +2010,9 @@ function closeDecoratePanel() {
 async function moveSelectedDecorObjectTo(point) {
   const zone = activeScene().zones[state.selectedDecorObjectId];
   if (!state.decorating || !zone || !zoneSupportsAction(zone, "decorate_replace")) return false;
-  const bounds = zoneBounds(zone);
-  const width = clamp(bounds.w || 0.1, 0.05, 0.28);
-  const height = clamp(bounds.h || 0.08, 0.05, 0.26);
+  const bounds = zoneDefaultRenderRect(zone);
+  const width = clamp(bounds.w || 0.1, 0.05, 0.32);
+  const height = clamp(bounds.h || 0.08, 0.05, 0.34);
   zone.placementRect = normalizePlacementRect({
     x: point.x - width / 2,
     y: point.y - height / 2,
