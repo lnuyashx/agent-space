@@ -95,7 +95,7 @@ class PixiScenePreview {
     const scene = this.activeScene();
     const [sceneTexture, agentTexture] = await Promise.all([
       this.sceneTexture(scene),
-      Assets.load<Texture>(this.data.assets.agent),
+      this.agentTexture(),
       this.ensureSceneAtlases(scene),
     ]);
 
@@ -105,6 +105,18 @@ class PixiScenePreview {
     this.agentSprite = new Sprite(agentTexture);
     this.agentSprite.anchor.set(0.5, 1);
     this.world.addChild(this.agentSprite);
+  }
+
+  private async agentTexture(): Promise<Texture> {
+    const texture = await Assets.load<Texture>(this.data.assets.agent);
+    const pet = this.data.localRuntime?.pet;
+    const frameGrid = pet?.frameGrid;
+    const idle = frameGrid?.states?.idle;
+    if (!frameGrid || !idle) return texture;
+    return new Texture({
+      source: texture.source,
+      frame: new Rectangle(0, idle.row * frameGrid.cellHeight, frameGrid.cellWidth, frameGrid.cellHeight),
+    });
   }
 
   async render(): Promise<void> {
@@ -251,8 +263,13 @@ class PixiScenePreview {
     const startObject = agent?.initialObject ? scene.placedObjects[agent.initialObject.objectId] : null;
     const point = sceneToPixi(startObject?.point || scene.entry, cover);
     this.agentSprite.position.set(point.x, point.y);
-    this.agentSprite.width = 72;
-    this.agentSprite.height = 124;
+    if (this.data.localRuntime?.pet?.frameGrid) {
+      this.agentSprite.width = 92;
+      this.agentSprite.height = 100;
+    } else {
+      this.agentSprite.width = 72;
+      this.agentSprite.height = 124;
+    }
     this.world.addChild(this.agentSprite);
   }
 

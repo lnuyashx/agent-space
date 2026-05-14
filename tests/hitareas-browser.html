@@ -287,6 +287,14 @@
               pointInWalkable(zone.interactionPoint, scene),
               `${sceneId}.${objectId} interactionPoint is outside walkable space`,
             );
+            const item = window.AGENT_SPACE_DATA.itemCatalog[zone.itemId];
+            if (item?.actions?.includes("decorate_replace")) {
+              assert(Boolean(zone.renderRect), `${sceneId}.${objectId} is missing renderRect`);
+              ["x", "y", "w", "h"].forEach((key) => {
+                assert(Number.isFinite(Number(zone.renderRect?.[key])), `${sceneId}.${objectId}.renderRect.${key} is not finite`);
+              });
+              assert(zone.renderRect.w > 0 && zone.renderRect.h > 0, `${sceneId}.${objectId} renderRect should have positive size`);
+            }
           });
         });
 
@@ -298,6 +306,7 @@
           const atlas = Object.values(window.AGENT_SPACE_DATA.assets.atlases || {}).find((entry) => entry.key === item.sprite.atlasKey);
           assert(Boolean(atlas), `${itemId} points to missing atlas ${item.sprite.atlasKey}`);
           assert(Boolean(atlas.image), `${itemId} atlas ${item.sprite.atlasKey} is missing an image path`);
+          assert(Boolean(atlas.imageSize?.w && atlas.imageSize?.h), `${itemId} atlas ${item.sprite.atlasKey} is missing imageSize`);
           assert(Boolean(atlas.frames?.[item.sprite.spriteId]), `${itemId} points to missing atlas frame ${item.sprite.spriteId}`);
         });
 
@@ -309,6 +318,15 @@
           indoor.decoratingAssetId !== indoor.assetId,
           "indoor decoratingAssetId should use a separate empty-room background",
         );
+        assert(Array.isArray(indoor.backgroundOptions) && indoor.backgroundOptions.length >= 4, "indoor should define local room background options");
+        indoor.backgroundOptions.forEach((background) => {
+          assert(Boolean(background.id), "indoor background option is missing id");
+          assert(Boolean(background.label), `${background.id} is missing a label`);
+          assert(Boolean(sceneAssets[background.assetId]), `${background.id} points to missing asset ${background.assetId}`);
+          if (background.decoratingAssetId) {
+            assert(Boolean(sceneAssets[background.decoratingAssetId]), `${background.id} points to missing decorating asset ${background.decoratingAssetId}`);
+          }
+        });
 
         const passed = assertions.filter((item) => item.pass).length;
         report.textContent = `HITAREA_TEST_PASS\n${passed} browser assertions passed.`;

@@ -3,6 +3,8 @@ export {};
 declare global {
   interface Window {
     AGENT_SPACE_DATA?: AgentSpaceData;
+    AGENT_SPACE_LOCAL_RUNTIME?: AgentSpaceLocalRuntime;
+    AGENT_SPACE_READY?: boolean;
     __AGENT_SPACE_PIXI__?: unknown;
   }
 }
@@ -13,6 +15,7 @@ export interface AgentSpaceData {
     scenes: Record<string, string>;
     atlases?: Record<string, AgentSpaceAtlas>;
   };
+  localRuntime?: AgentSpaceLocalRuntime;
   itemCatalog: Record<string, AgentSpaceItem>;
   inventory: {
     owned: Record<string, number>;
@@ -46,11 +49,21 @@ export interface AgentSpaceItem {
 
 export interface AgentSpaceScene {
   assetId: string;
+  decoratingAssetId?: string;
+  backgroundOptions?: AgentSpaceRoomBackground[];
   status: string;
   hash: string;
   entry: AgentSpacePoint;
   placedObjects: Record<string, AgentSpacePlacedObject>;
   walkableRects: AgentSpaceRect[];
+}
+
+export interface AgentSpaceRoomBackground {
+  id: string;
+  label: string;
+  assetId: string;
+  decoratingAssetId?: string;
+  description?: string;
 }
 
 export interface AgentSpaceAgent {
@@ -78,6 +91,7 @@ export interface AgentSpacePlacedObject {
   label: string;
   point: AgentSpacePoint;
   hitAreas?: AgentSpaceShape[];
+  renderRect?: AgentSpaceRect;
   rect?: AgentSpaceRect;
   polygon?: AgentSpacePoint[];
   preview?: string;
@@ -101,6 +115,7 @@ export interface AgentSpaceRect {
 export interface AgentSpaceAtlas {
   key: string;
   image: string;
+  imageSize?: AgentSpaceFrameSize;
   frameSize?: AgentSpaceFrameSize;
   frames?: Record<string, AgentSpaceRect>;
   status?: string;
@@ -109,6 +124,58 @@ export interface AgentSpaceAtlas {
 export interface AgentSpaceFrameSize {
   w: number;
   h: number;
+}
+
+export interface AgentSpaceLocalRuntime {
+  schemaVersion: number;
+  status: "local-pet" | "fallback";
+  manifestPath: string;
+  agentStatePath: string;
+  agentStateAvailable: boolean;
+  pet: AgentSpaceLocalRuntimePet | null;
+  agentState: AgentSpaceLocalRuntimeAgentState;
+}
+
+export interface AgentSpaceLocalRuntimeManifest {
+  schemaVersion: number;
+  generatedAt?: string;
+  sourceCodexHome?: string;
+  activePetId: string | null;
+  pets: Record<string, AgentSpaceLocalRuntimePet>;
+}
+
+export interface AgentSpaceLocalRuntimePet {
+  id: string;
+  displayName: string;
+  description?: string;
+  spritesheetPath: string;
+  source?: string;
+  frameGrid?: AgentSpacePetFrameGrid;
+  stateToAnimation?: Record<string, string>;
+}
+
+export interface AgentSpacePetFrameGrid {
+  columns: number;
+  rows: number;
+  cellWidth: number;
+  cellHeight: number;
+  states: Record<string, AgentSpacePetAnimationRow>;
+}
+
+export interface AgentSpacePetAnimationRow {
+  row: number;
+  frames: number;
+  durations: number[];
+}
+
+export interface AgentSpaceLocalRuntimeAgentState {
+  schemaVersion: number;
+  agentId: string;
+  petId: string | null;
+  status: string;
+  taskLabel: string;
+  activeTool: string | null;
+  updatedAt: string;
 }
 
 export type AgentSpaceShape =

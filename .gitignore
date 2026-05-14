@@ -13,6 +13,8 @@ demo-*.png
 *.log
 .tmp/
 tmp/
+/.runtime/
+/public/local-agent-space/
 
 # Local editor files
 .idea/

@@ -29,12 +29,17 @@ window.AGENT_SPACE_DATA_MODULES.assets = {
   "scenes": {
     "indoor": "./assets/scene-indoor-v2.png",
     "indoorEmptyPrototype": "./assets/scene-indoor-empty-prototype.svg",
+    "indoorStudy": "./assets/scene-study.png",
+    "indoorBedroom": "./assets/scene-bedroom.png",
+    "indoorKitchen": "./assets/scene-kitchen.png",
+    "indoorStudio": "./assets/scene-studio.png",
     "yard": "./assets/scene-yard.png"
   },
   "atlases": {
     "furniturePrototype": {
       "key": "prototype-furniture",
       "image": "./assets/furniture-prototype-atlas.svg",
+      "imageSize": { "w": 800, "h": 480 },
       "frameSize": { "w": 160, "h": 120 },
       "frames": PROTOTYPE_ATLAS_FRAMES,
       "status": "prototype-art"

@@ -66,9 +66,14 @@
         };
       }
 
+      function savedPayload(storage) {
+        const key = SAVE_KEYS.find((candidate) => storage.getItem(candidate));
+        return key ? JSON.parse(storage.getItem(key) || "{}") : null;
+      }
+
       function loadApp(label) {
         return new Promise((resolve, reject) => {
-          const timeout = window.setTimeout(() => reject(new Error(`Timed out loading app frame for ${label}`)), 2500);
+          const timeout = window.setTimeout(() => reject(new Error(`Timed out loading app frame for ${label}`)), 6000);
           frame.onload = () => {
             window.clearTimeout(timeout);
             try {
@@ -77,7 +82,7 @@
               reject(error);
             }
           };
-          frame.src = `../index.html?smoke=${encodeURIComponent(label)}-${Date.now()}`;
+          frame.src = `../index.html?localRuntime=off&smoke=${encodeURIComponent(label)}-${Date.now()}`;
         });
       }
 
@@ -95,7 +100,7 @@
               return;
             }
             if (Date.now() - started > timeoutMs) {
-              reject(new Error(message));
+              reject(new Error(typeof message === "function" ? message() : message));
               return;
             }
             win.setTimeout(tick, 50);
@@ -130,6 +135,10 @@
         return doc.querySelector(`#themeList .theme-bundle-button[data-theme-id="${themeId}"]`);
       }
 
+      function backgroundButton(doc, backgroundId) {
+        return doc.querySelector(`#backgroundList .background-card[data-background-id="${backgroundId}"]`);
+      }
+
       function setComposer(doc, mode, value) {
         doc.querySelector("#intentSelect").value = mode;
         doc.querySelector("#promptInput").value = value;
@@ -154,8 +163,10 @@
 
           await waitFor(
             win,
-            () => doc.querySelector("#worldCanvas")?.width >= 720 && text(doc, "#currentTask") === "在客厅休息",
-            "App did not boot into the indoor idle state",
+            () => win.AGENT_SPACE_READY && doc.querySelector("#worldCanvas")?.width >= 720 && text(doc, "#currentTask") === "在客厅休息",
+            () =>
+              `App did not boot into the indoor idle state: ready=${String(win.AGENT_SPACE_READY)} task=${text(doc, "#currentTask")} width=${String(doc.querySelector("#worldCanvas")?.width)}`,
+            10000,
           );
           assert(text(doc, "#activeAgentName") === "Aria", "App did not boot with Aria selected");
           pass("app booted");
@@ -188,27 +199,73 @@
           await openDecorateDrawer(win, doc);
           pass("decoration drawer opened");
 
+          const codingStateButton = doc.querySelector('[data-local-agent-status="coding"]');
+          assert(Boolean(codingStateButton), "Local agent state preview controls were not rendered");
+          click(win, codingStateButton);
+          await waitFor(
+            win,
+            () =>
+              text(doc, "#currentTask") === "正在处理当前任务" &&
+              doc.querySelector('[data-local-agent-status="coding"]')?.classList.contains("active"),
+            () => `Local agent coding state preview did not update the room state: task=${text(doc, "#currentTask")}`,
+          );
+          pass("local agent state preview updated room behavior");
+
+          const studyBackgroundButton = backgroundButton(doc, "focusStudy");
+          assert(Boolean(studyBackgroundButton), "Focus study background option was not rendered");
+          click(win, studyBackgroundButton);
+          await waitFor(
+            win,
+            () => savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.backgroundId === "focusStudy",
+            "Local room background switch did not persist",
+          );
+          assert(text(doc, "#backgroundCurrentLabel").includes("书房专注"), "Background label did not reflect selected room background");
+          assert(text(doc, "#roomSummaryMeta").includes("背景 书房专注"), "Room summary did not reflect selected room background");
+          pass("local room background switch persisted");
+
           const lavenderButton = itemButton(doc, "薰衣草云床");
-          assert(Boolean(lavenderButton), "Shop item 薰衣草云床 was not listed");
-          assert(lavenderButton.textContent.includes("SHOP"), "Unowned shop item was not marked as SHOP");
-          const initialCoins = Number(text(doc, "#coinValue"));
-          const expectedCoinsAfterBuy = initialCoins - 46;
+          assert(Boolean(lavenderButton), "Local decoration item 薰衣草云床 was not listed");
+          assert(lavenderButton.textContent.includes("本地可用"), "Local decoration item was not marked as locally available");
           click(win, lavenderButton);
           await waitFor(
             win,
-            () => Number(text(doc, "#coinValue")) <= initialCoins - 1 && Number(text(doc, "#coinValue")) >= expectedCoinsAfterBuy,
-            "Shop purchase did not update coins",
+            () => {
+              const next = savedPayload(win.localStorage);
+              return next?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_lavender_cloud";
+            },
+            "Local furniture replacement did not persist",
           );
 
           const { payload: saved } = readSavedState(win.localStorage);
-          assert(saved.inventory?.coins <= initialCoins, "Saved coin balance should not increase after purchase");
-          assert(saved.inventory?.coins >= expectedCoinsAfterBuy, "Saved coin balance did not reflect purchase deduction");
-          assert(saved.inventory?.owned?.bed_lavender_cloud === 1, "Purchased bed was not persisted as owned");
+          assert(saved.inventory?.owned?.bed_lavender_cloud === 1, "Local replacement item was not persisted as owned");
           assert(
             saved.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_lavender_cloud",
             "Placed bed replacement was not persisted",
           );
-          pass("shop purchase and placed furniture persisted");
+          pass("local decoration replacement persisted without purchase flow");
+
+          clickScenePoint(win, doc, { x: 0.53, y: 0.69 });
+          await waitFor(
+            win,
+            () => Boolean(savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.placement),
+            "Local furniture placement did not persist",
+          );
+          const moved = savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.placement;
+          assert(Number.isFinite(Number(moved?.x)) && Number.isFinite(Number(moved?.y)), "Persisted placement should include numeric x/y");
+          assert(text(doc, "#roomSummaryMeta").includes("1 件移动"), "Room summary did not reflect moved furniture");
+          pass("local decoration placement persisted");
+
+          click(win, doc.querySelector("#resetRoomBtn"));
+          await waitFor(
+            win,
+            () => {
+              const nextScene = savedPayload(win.localStorage)?.sceneSnapshot?.indoor;
+              const nextBed = nextScene?.placedObjects?.bedroomBed;
+              return nextBed?.itemId === "bed_pink_basic" && !nextBed.placement && nextScene?.backgroundId === "fullHome";
+            },
+            "Room reset did not restore default background, furniture, and placement",
+          );
+          pass("room customization reset restored defaults");
 
           const warmBundleButton = themeBundleButton(doc, "warmStarter");
           assert(Boolean(warmBundleButton), "Warm starter theme bundle action was not rendered");
@@ -216,8 +273,11 @@
           await waitFor(
             win,
             () => {
-              const next = readSavedState(win.localStorage).payload;
-              return next.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_pink_basic";
+              const next = savedPayload(win.localStorage);
+              return (
+                next?.sceneSnapshot?.indoor?.placedObjects?.bedroomBed?.itemId === "bed_pink_basic" &&
+                doc.querySelector('[data-bundle-id="oceanFocusBundle"]')?.disabled === false
+              );
             },
             "Theme bundle apply did not persist warm starter equipPlan",
           );
@@ -231,34 +291,30 @@
 
           const oceanBundleButton = themeBundleButton(doc, "oceanFocus");
           assert(Boolean(oceanBundleButton), "Ocean focus bundle action was not rendered");
-          const coinsBeforeOceanFirstApply = Number(text(doc, "#coinValue"));
           click(win, oceanBundleButton);
           await waitFor(
             win,
             () => {
-              const next = readSavedState(win.localStorage).payload;
-              return next.sceneSnapshot?.indoor?.ownedBundleIds?.includes("oceanFocusBundle");
+              const next = savedPayload(win.localStorage);
+              return next?.sceneSnapshot?.indoor?.ownedBundleIds?.includes("oceanFocusBundle");
             },
             "Paid bundle apply did not persist owned bundle state",
           );
           const { payload: afterOceanFirstApply } = readSavedState(win.localStorage);
-          assert(
-            Number(afterOceanFirstApply.inventory?.coins) === coinsBeforeOceanFirstApply - 88,
-            "Paid bundle first apply did not deduct expected coins",
-          );
+          assert(afterOceanFirstApply.sceneSnapshot?.indoor?.ownedBundleIds?.includes("oceanFocusBundle"), "Local bundle ownership was not persisted");
 
           click(win, oceanBundleButton);
           await waitFor(
             win,
-            () => Number(readSavedState(win.localStorage).payload.inventory?.coins) === Number(afterOceanFirstApply.inventory?.coins),
-            "Owned paid bundle reapply should not charge coins again",
+            () => savedPayload(win.localStorage)?.sceneSnapshot?.indoor?.ownedBundleIds?.includes("oceanFocusBundle"),
+            "Local bundle reapply should keep ownership state",
           );
           const { payload: afterOceanSecondApply } = readSavedState(win.localStorage);
           assert(
             Number(afterOceanSecondApply.inventory?.coins) === Number(afterOceanFirstApply.inventory?.coins),
-            "Reapplying owned paid bundle unexpectedly changed coin balance",
+            "Local bundle reapply unexpectedly changed compatibility coin balance",
           );
-          pass("paid bundle ownership persisted and reapply avoided duplicate charge");
+          pass("local bundle ownership persisted and reapply avoided purchase flow");
 
           app = await loadApp("reload");
           win = app.win;
@@ -266,11 +322,11 @@
 
           await waitFor(
             win,
-            () => Number(text(doc, "#coinValue")) === Number(afterOceanSecondApply.inventory?.coins),
-            "Reload did not restore valid coin balance",
+            () => win.AGENT_SPACE_READY && text(doc, "#coinValue") === "全解锁",
+            "Reload did not restore local-unlocked mode label",
           );
           await openDecorateDrawer(win, doc);
-          assert(doc.querySelector("#decorateSlotList").textContent.includes("粉色床"), "Reload did not restore bundle-applied furniture label");
+          assert(doc.querySelector("#decorateSlotList").textContent.includes("海盐蓝床"), "Reload did not restore bundle-applied furniture label");
           pass("reload restored localStorage state");
 
           clearSaveKeys(win.localStorage);

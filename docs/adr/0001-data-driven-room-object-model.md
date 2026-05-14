@@ -34,3 +34,4 @@ The current canvas prototype may keep static backgrounds temporarily, but all in
 - Decoration changes should update placed object item ids.
 - Future PixiJS work can replace the renderer while keeping the data model.
 - `hitAreas` are a bridge from static art to sprite-local hit testing.
+- `renderRect` is kept separate from `hitAreas` so art placement/scale can improve without changing click semantics.

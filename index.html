@@ -34,8 +34,8 @@
         </section>
 
         <section class="room-hud hud-right">
-          <span>金币</span>
-          <strong id="coinValue">50</strong>
+          <span>本地</span>
+          <strong id="coinValue">全解锁</strong>
           <button class="ghost-button" id="modeBtn" type="button">
             <span class="status-dot"></span>
             <span id="modeLabel">单机</span>
@@ -87,17 +87,35 @@
       <div class="drawer-head">
         <div>
           <span>装修模式</span>
-          <h2>槽位替换 / 商城</h2>
+          <h2>槽位替换 / 本地全解锁</h2>
         </div>
         <button class="icon-button" id="closeDecorateBtn" type="button" title="关闭">×</button>
       </div>
       <div class="decorate-body">
+        <section class="local-state-section">
+          <h3>Agent 状态</h3>
+          <div class="local-state-controls" id="localStateControls"></div>
+          <small id="localStateMeta">文件同步</small>
+        </section>
+        <section class="room-summary-section">
+          <h3>房间</h3>
+          <div class="room-summary-card">
+            <strong id="roomSummaryTitle">当前房间</strong>
+            <small id="roomSummaryMeta">默认布局</small>
+            <button id="resetRoomBtn" type="button">恢复默认</button>
+          </div>
+        </section>
+        <section class="background-section">
+          <h3 id="backgroundCurrentLabel">房间背景</h3>
+          <div class="background-list" id="backgroundList"></div>
+        </section>
         <section>
           <h3>房间槽位</h3>
           <div class="slot-list" id="decorateSlotList"></div>
         </section>
         <section>
           <h3 id="decorateCurrentSlot">选择槽位</h3>
+          <div class="placement-tools" id="decoratePlacementTools"></div>
           <div class="item-list" id="decorateItemList"></div>
         </section>
         <section class="theme-section">

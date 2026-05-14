@@ -10,6 +10,35 @@ const BRIDGE_SAVE_KEY = "agent-space-local-bridge";
 const BRIDGE_TIMEOUT_MS = 2200;
 const FARM_LIFECYCLE_TICK_MS = 1500;
 const DEV_STAGE_MIN_COINS = 999999;
+const LOCAL_AGENT_STATE_POLL_MS = 2000;
+const LOCAL_ONLY_CUSTOMIZATION = true;
+const LOCAL_AGENT_STATUS_LABELS = {
+  idle: "本地待机",
+  thinking: "正在思考",
+  coding: "正在处理当前任务",
+  tool_calling: "正在调用本地工具",
+  waiting_user: "等待用户输入",
+  error: "需要查看异常",
+  done: "任务完成，正在放松",
+};
+const LOCAL_AGENT_STATUS_OPTIONS = [
+  { status: "idle", label: "待机", tool: null },
+  { status: "thinking", label: "思考", tool: null },
+  { status: "coding", label: "写代码", tool: null },
+  { status: "tool_calling", label: "工具", tool: "terminal" },
+  { status: "waiting_user", label: "等你", tool: null },
+  { status: "done", label: "完成", tool: null },
+  { status: "error", label: "异常", tool: null },
+];
+const LOCAL_AGENT_STATUS_TARGETS = {
+  idle: "livingSofa",
+  thinking: "studyBookshelf",
+  coding: "studyDesk",
+  tool_calling: "studyDesk",
+  waiting_user: "gardenDoor",
+  error: "studyDesk",
+  done: "livingSofa",
+};
 const saveDebugState = {
   key: SAVE_KEY,
   schemaVersion: SAVE_SCHEMA_VERSION,
@@ -85,15 +114,27 @@ const sceneZones = Object.fromEntries(
 );
 
 const scenes = Object.fromEntries(
-  Object.entries(gameData.scenes).map(([sceneId, scene]) => [
-    sceneId,
-    {
-      ...scene,
-      image: sceneImages[scene.assetId],
-      decoratingImage: scene.decoratingAssetId ? sceneImages[scene.decoratingAssetId] : null,
-      zones: scene.placedObjects,
-    },
-  ]),
+  Object.entries(gameData.scenes).map(([sceneId, scene]) => {
+    const backgroundOptions = Array.isArray(scene.backgroundOptions) ? scene.backgroundOptions : [];
+    const defaultBackground = backgroundOptions[0] || {
+      id: scene.assetId,
+      label: scene.label,
+      assetId: scene.assetId,
+      decoratingAssetId: scene.decoratingAssetId,
+    };
+    return [
+      sceneId,
+      {
+        ...scene,
+        backgroundOptions,
+        backgroundId: scene.backgroundId || defaultBackground.id,
+        defaultBackgroundId: defaultBackground.id,
+        image: sceneImages[scene.assetId],
+        decoratingImage: scene.decoratingAssetId ? sceneImages[scene.decoratingAssetId] : null,
+        zones: scene.placedObjects,
+      },
+    ];
+  }),
 );
 
 applySavedInventory(savedState.inventory);
@@ -102,6 +143,7 @@ Object.values(scenes).forEach((scene) => {
   Object.entries(scene.zones).forEach(([objectId, zone]) => {
     zone.objectId = objectId;
     zone.defaultItemId = zone.defaultItemId || zone.itemId;
+    zone.defaultLabel = zone.defaultLabel || zone.label;
   });
 });
 applyDefaultSceneThemes();
@@ -160,6 +202,12 @@ const state = {
   farmLifecyclePersisting: false,
   pendingFarmAction: false,
   pendingThemeAction: false,
+  localAgentStateSignature: null,
+  localAgentStateTimer: null,
+  localAgentStateSource: "init",
+  localAgentPreviewLocked: false,
+  syncedLocalAgentState: null,
+  syncedLocalAgentStateSource: "fallback",
 };
 
 const el = {
@@ -187,11 +235,19 @@ const el = {
   decorateSlotList: document.querySelector("#decorateSlotList"),
   decorateItemList: document.querySelector("#decorateItemList"),
   decorateCurrentSlot: document.querySelector("#decorateCurrentSlot"),
+  decoratePlacementTools: document.querySelector("#decoratePlacementTools"),
   themeCurrentLabel: document.querySelector("#themeCurrentLabel"),
   themeList: document.querySelector("#themeList"),
+  roomSummaryTitle: document.querySelector("#roomSummaryTitle"),
+  roomSummaryMeta: document.querySelector("#roomSummaryMeta"),
+  resetRoomBtn: document.querySelector("#resetRoomBtn"),
+  backgroundCurrentLabel: document.querySelector("#backgroundCurrentLabel"),
+  backgroundList: document.querySelector("#backgroundList"),
   saveSchemaLabel: document.querySelector("#saveSchemaLabel"),
   saveDebugMeta: document.querySelector("#saveDebugMeta"),
   resetSaveBtn: document.querySelector("#resetSaveBtn"),
+  localStateControls: document.querySelector("#localStateControls"),
+  localStateMeta: document.querySelector("#localStateMeta"),
   farmActionPanel: document.querySelector("#farmActionPanel"),
   farmPanelTitle: document.querySelector("#farmPanelTitle"),
   farmPanelState: document.querySelector("#farmPanelState"),
@@ -263,6 +319,16 @@ function applySavedSceneSnapshot(sceneSnapshot) {
         if (!zone || !item || !item.slots?.includes(zone.slot)) return;
         zone.itemId = objectSave.itemId;
         zone.label = item.label;
+        if (objectSave?.placement && typeof objectSave.placement === "object") {
+          const placement = normalizePlacementRect(objectSave.placement);
+          if (placement) {
+            zone.placementRect = placement;
+            zone.customInteractionPoint = nearestWalkablePoint({
+              x: placement.x + placement.w / 2,
+              y: placement.y + placement.h,
+            }, scene);
+          }
+        }
       });
     }
     if (Array.isArray(sceneSave.ownedThemeIds)) {
@@ -273,6 +339,12 @@ function applySavedSceneSnapshot(sceneSnapshot) {
     }
     if (typeof sceneSave.themeId === "string" && canUseThemeInScene(sceneSave.themeId, sceneId)) {
       scene.themeId = sceneSave.themeId;
+    }
+    if (typeof sceneSave.backgroundId === "string" && canUseBackgroundInScene(sceneSave.backgroundId, sceneId)) {
+      scene.backgroundId = sceneSave.backgroundId;
+    }
+    if (!canUseBackgroundInScene(scene.backgroundId, sceneId)) {
+      scene.backgroundId = defaultBackgroundIdForScene(scene);
     }
     if (!Array.isArray(scene.ownedThemeIds) || !scene.ownedThemeIds.length) {
       scene.ownedThemeIds = [defaultThemeIdForScene(sceneId)].filter(Boolean);
@@ -285,6 +357,26 @@ function applySavedSceneSnapshot(sceneSnapshot) {
     const inferredBundleIds = inferBundleOwnershipFromThemes(sceneId, scene.ownedThemeIds);
     scene.ownedBundleIds = Array.from(new Set([...validSavedBundleIds, ...inferredBundleIds]));
   });
+}
+
+function backgroundOptionsForScene(scene = activeScene()) {
+  return Array.isArray(scene?.backgroundOptions) ? scene.backgroundOptions : [];
+}
+
+function defaultBackgroundIdForScene(scene = activeScene()) {
+  const options = backgroundOptionsForScene(scene);
+  return scene?.defaultBackgroundId || options[0]?.id || scene?.assetId || null;
+}
+
+function canUseBackgroundInScene(backgroundId, sceneId) {
+  const scene = scenes[sceneId];
+  return backgroundOptionsForScene(scene).some((option) => option.id === backgroundId);
+}
+
+function sceneBackground(scene = activeScene()) {
+  const options = backgroundOptionsForScene(scene);
+  if (!options.length) return null;
+  return options.find((option) => option.id === scene.backgroundId) || options[0];
 }
 
 function themesForScene(sceneId) {
@@ -446,12 +538,19 @@ function buildSceneSnapshot() {
       sceneId,
       {
         themeId: scene.themeId || defaultThemeIdForScene(sceneId),
+        backgroundId: scene.backgroundId || defaultBackgroundIdForScene(scene),
         ownedThemeIds: Array.isArray(scene.ownedThemeIds) ? Array.from(new Set(scene.ownedThemeIds)) : [],
         ownedBundleIds: Array.isArray(scene.ownedBundleIds)
           ? Array.from(new Set(scene.ownedBundleIds.filter((bundleId) => canUseBundleInScene(bundleId, sceneId))))
           : [],
         placedObjects: Object.fromEntries(
-          Object.entries(scene.zones).map(([objectId, zone]) => [objectId, { itemId: zone.itemId }]),
+          Object.entries(scene.zones).map(([objectId, zone]) => [
+            objectId,
+            {
+              itemId: zone.itemId,
+              ...(zone.placementRect ? { placement: cloneData(zone.placementRect) } : {}),
+            },
+          ]),
         ),
       },
     ]),
@@ -570,10 +669,78 @@ function activeScene() {
   return scenes[state.currentScene];
 }
 
+function localRuntime() {
+  return window.AGENT_SPACE_LOCAL_RUNTIME || gameData.localRuntime || null;
+}
+
+function activeLocalAgentState() {
+  return localRuntime()?.agentState || null;
+}
+
+function localAgentLabel(agentState = activeLocalAgentState()) {
+  if (!agentState) return null;
+  const status = agentState.status || "idle";
+  const baseLabel = agentState.taskLabel || LOCAL_AGENT_STATUS_LABELS[status] || status;
+  return agentState.activeTool ? `${baseLabel} · ${agentState.activeTool}` : baseLabel;
+}
+
+function localAgentTargetZone(agentState = activeLocalAgentState()) {
+  const objectId = LOCAL_AGENT_STATUS_TARGETS[agentState?.status] || LOCAL_AGENT_STATUS_TARGETS.idle;
+  return scenes.indoor.zones[objectId] || scenes.indoor.zones.livingSofa || null;
+}
+
+function petFrameForAnimation(animationKey, timeMs = Date.now()) {
+  const pet = localRuntime()?.pet;
+  const grid = pet?.frameGrid;
+  if (!grid) return null;
+  const row = grid.states?.[animationKey] || grid.states?.idle;
+  if (!row) return null;
+  const durations = Array.isArray(row.durations) && row.durations.length
+    ? row.durations
+    : Array.from({ length: row.frames || 1 }, () => 160);
+  const totalMs = durations.reduce((sum, duration) => sum + Math.max(1, Number(duration) || 1), 0);
+  let cursor = totalMs ? timeMs % totalMs : 0;
+  let frame = 0;
+  for (let index = 0; index < durations.length; index += 1) {
+    cursor -= Math.max(1, Number(durations[index]) || 1);
+    if (cursor <= 0) {
+      frame = index;
+      break;
+    }
+  }
+  const maxFrame = Math.max(0, Math.min(row.frames || durations.length || 1, grid.columns || 1) - 1);
+  return {
+    x: Math.min(frame, maxFrame) * grid.cellWidth,
+    y: row.row * grid.cellHeight,
+    w: grid.cellWidth,
+    h: grid.cellHeight,
+  };
+}
+
+function currentPetFrame(timeMs = Date.now()) {
+  const runtime = localRuntime();
+  if (!runtime?.pet?.frameGrid) return null;
+  if (state.agent.status === "walking") {
+    return petFrameForAnimation("running-right", timeMs);
+  }
+  const agentState = activeLocalAgentState();
+  const animationKey = runtime.pet.stateToAnimation?.[agentState?.status || "idle"] || "idle";
+  return petFrameForAnimation(animationKey, timeMs);
+}
+
+function backgroundAssetIdForScene(scene = activeScene()) {
+  const background = sceneBackground(scene);
+  if (!background) return scene.assetId;
+  const useDecoratingImage = state.decorating || sceneHasDecorOverrides(scene);
+  return useDecoratingImage
+    ? background.decoratingAssetId || scene.decoratingAssetId || background.assetId
+    : background.assetId;
+}
+
 function activeSceneImage() {
   const scene = activeScene();
-  const decoratingImage = state.decorating ? scene.decoratingImage : null;
-  if (decoratingImage?.complete && decoratingImage.naturalWidth) return decoratingImage;
+  const backgroundImage = sceneImages[backgroundAssetIdForScene(scene)];
+  if (backgroundImage?.complete && backgroundImage.naturalWidth) return backgroundImage;
   return scene.image;
 }
 
@@ -644,7 +811,24 @@ function pointInEllipse(point, ellipse) {
   return ((point.x - cx) ** 2) / (rx ** 2) + ((point.y - cy) ** 2) / (ry ** 2) <= 1;
 }
 
+function normalizePlacementRect(value) {
+  const x = Number(value?.x);
+  const y = Number(value?.y);
+  const w = Number(value?.w);
+  const h = Number(value?.h);
+  if (![x, y, w, h].every(Number.isFinite)) return null;
+  const width = clamp(w, 0.035, 0.36);
+  const height = clamp(h, 0.035, 0.32);
+  return {
+    x: clamp(x, 0, 1 - width),
+    y: clamp(y, 0, 1 - height),
+    w: width,
+    h: height,
+  };
+}
+
 function zoneShapes(zone) {
+  if (zone.placementRect) return [{ type: "rect", ...zone.placementRect }];
   if (zone.hitAreas) return zone.hitAreas;
   if (zone.polygon) return [{ type: "polygon", points: zone.polygon }];
   if (zone.rect) return [{ type: "rect", ...zone.rect }];
@@ -699,6 +883,14 @@ function zoneBounds(zone) {
   };
 }
 
+function zoneDefaultRenderRect(zone) {
+  return normalizePlacementRect(zone.renderRect) || zoneBounds(zone);
+}
+
+function zoneRenderRect(zone) {
+  return zone.placementRect || zoneDefaultRenderRect(zone);
+}
+
 function zoneAt(point) {
   return Object.values(activeScene().zones).find((zone) => pointInZone(point, zone)) || null;
 }
@@ -708,6 +900,9 @@ function itemForZone(zone) {
 }
 
 function ownedCount(itemId) {
+  if (LOCAL_ONLY_CUSTOMIZATION && gameData.itemCatalog[itemId]?.actions?.includes("decorate_replace")) {
+    return Math.max(1, Number(gameData.inventory.owned[itemId]) || 0);
+  }
   return gameData.inventory.owned[itemId] || 0;
 }
 
@@ -717,6 +912,10 @@ function zoneSupportsAction(zone, action) {
 
 function decoratableObjects(scene = activeScene()) {
   return Object.entries(scene.zones).filter(([, zone]) => zoneSupportsAction(zone, "decorate_replace"));
+}
+
+function sceneHasDecorOverrides(scene = activeScene()) {
+  return decoratableObjects(scene).some(([, zone]) => zone.itemId !== zone.defaultItemId || Boolean(zone.placementRect));
 }
 
 function catalogItemsForSlot(slot) {
@@ -742,8 +941,29 @@ function frameForSprite(sprite) {
   return atlas?.frames?.[sprite.spriteId] || null;
 }
 
-function swatchMarkup(item) {
-  const visual = itemSprite(item).fallback;
+function atlasFrameStyle(atlas, frame) {
+  if (!atlas?.image || !frame) return "";
+  const imageSize = atlas.imageSize || atlas.frameSize || { w: frame.w, h: frame.h };
+  const sizeX = imageSize.w && frame.w ? (imageSize.w / frame.w) * 100 : 100;
+  const sizeY = imageSize.h && frame.h ? (imageSize.h / frame.h) * 100 : 100;
+  const positionX = imageSize.w === frame.w ? 0 : (frame.x / (imageSize.w - frame.w)) * 100;
+  const positionY = imageSize.h === frame.h ? 0 : (frame.y / (imageSize.h - frame.h)) * 100;
+  return [
+    `background-image:url('${atlas.image}')`,
+    `background-size:${sizeX}% ${sizeY}%`,
+    `background-position:${positionX}% ${positionY}%`,
+  ].join("; ");
+}
+
+function itemThumbMarkup(item) {
+  const sprite = itemSprite(item);
+  const visual = sprite.fallback;
+  const atlas = atlasForSprite(sprite);
+  const frame = frameForSprite(sprite);
+  const atlasStyle = atlasFrameStyle(atlas, frame);
+  if (atlasStyle) {
+    return `<span class="decor-thumb" style="${atlasStyle}; --swatch:${visual.color}; --swatch-accent:${visual.accent};"></span>`;
+  }
   return `<span class="decor-swatch" style="--swatch:${visual.color}; --swatch-accent:${visual.accent};"></span>`;
 }
 
@@ -753,6 +973,9 @@ function itemPrice(item) {
 
 function itemCommerceText(itemId, item) {
   const owned = ownedCount(itemId);
+  if (LOCAL_ONLY_CUSTOMIZATION && item?.actions?.includes("decorate_replace")) {
+    return `${item.category} · 本地可用`;
+  }
   if (owned > 0) return `${item.category} · 拥有 ${owned}`;
   return `${item.category} · ${itemPrice(item)} 金币`;
 }
@@ -784,6 +1007,7 @@ function nearestWalkablePoint(point, scene = activeScene()) {
 }
 
 function zoneInteractionPoint(zone, scene = activeScene()) {
+  if (zone.customInteractionPoint) return nearestWalkablePoint(zone.customInteractionPoint, scene);
   if (zone.interactionPoint) return nearestWalkablePoint(zone.interactionPoint, scene);
   if (zone.point) return nearestWalkablePoint(zone.point, scene);
   const bounds = zoneBounds(zone);
@@ -940,10 +1164,11 @@ function drawThemeOverlay(theme, rect) {
 
 function drawObjectLayer() {
   const time = performance.now();
+  const customDecorView = state.decorating || sceneHasDecorOverrides();
   decoratableObjects().forEach(([objectId, zone]) => {
-    const changed = zone.itemId !== zone.defaultItemId;
+    const changed = zone.itemId !== zone.defaultItemId || Boolean(zone.placementRect);
     const selected = state.decorating && state.selectedDecorObjectId === objectId;
-    if (!state.decorating && !changed) return;
+    if (!customDecorView && !changed) return;
     drawPixelFurniture(zone, itemForZone(zone), {
       changed,
       selected,
@@ -1017,12 +1242,12 @@ function drawPixelFurniture(zone, item, options) {
   const spriteKind = visual.kind || item?.category;
   const atlasImage = atlasImages[sprite.atlasKey];
   const atlasFrame = frameForSprite(sprite);
-  const bounds = zoneBounds(zone);
+  const bounds = zoneRenderRect(zone);
   const p1 = sceneToCanvas({ x: bounds.x, y: bounds.y });
   const p2 = sceneToCanvas({ x: bounds.x + bounds.w, y: bounds.y + bounds.h });
   const width = Math.abs(p2.x - p1.x);
   const height = Math.abs(p2.y - p1.y);
-  const scale = clamp(Math.min(width / 116, height / 78), 0.52, 1.08);
+  const scale = clamp(Math.min(width / 116, height / 96), 0.52, 2.05);
   const pulse = options.selected ? 1 + Math.sin(options.time / 150) * 0.045 : 1;
   const alpha = options.selected || options.changed ? 0.96 : options.dimmed ? 0.58 : 0.76;
 
@@ -1047,11 +1272,11 @@ function drawPixelFurniture(zone, item, options) {
   else drawGenericItemSprite(visual);
 
   if (options.changed || state.decorating) {
-    pixelRect(-25, 36, 50, 16, "rgba(255, 250, 241, .92)", "rgba(47, 33, 24, .26)");
-    ctx.fillStyle = "#2d251e";
-    ctx.font = "bold 10px ui-sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(visual.short || sprite.spriteId, 0, 47);
+    ctx.strokeStyle = options.selected ? "rgba(217, 111, 66, .78)" : "rgba(255, 247, 228, .62)";
+    ctx.lineWidth = options.selected ? 3 : 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 35, 52, 13, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -1244,8 +1469,14 @@ function drawAgent(time) {
   ctx.ellipse(0, 24 - bob / scale, 21, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   if (agentImage.complete && agentImage.naturalWidth) {
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(agentImage, 0, 0, agentImage.naturalWidth, agentImage.naturalHeight, -34, -116, 68, 116);
+    const petFrame = currentPetFrame(time);
+    if (petFrame) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(agentImage, petFrame.x, petFrame.y, petFrame.w, petFrame.h, -46, -102, 92, 100);
+    } else {
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(agentImage, 0, 0, agentImage.naturalWidth, agentImage.naturalHeight, -34, -116, 68, 116);
+    }
   }
   if (state.agent.status === "working") {
     pixelRect(-30, -2, 60, 21, "#fffaf1", "rgba(32, 23, 17, .3)");
@@ -1350,9 +1581,20 @@ function themeSwatchMarkup(theme) {
 
 function themeCommerceText(theme, owned, equipped) {
   if (equipped) return `${theme.rarity} · 已装备`;
+  if (LOCAL_ONLY_CUSTOMIZATION) return `${theme.rarity} · 本地可用`;
   if (owned) return `${theme.rarity} · 已拥有`;
   const price = Number(theme.price || 0);
   return price > 0 ? `${theme.rarity} · ${price} 金币` : `${theme.rarity} · 免费`;
+}
+
+function backgroundThumbnailMarkup(background) {
+  const src = gameData.assets.scenes?.[background?.assetId] || "";
+  return `<span class="background-thumb" style="background-image:url('${src}')"></span>`;
+}
+
+function backgroundStatusText(background, equipped) {
+  if (equipped) return "当前背景";
+  return background?.description || "本地可用";
 }
 
 function themeBundlesForScene(themeId, sceneId) {
@@ -1439,7 +1681,7 @@ async function equipSceneTheme(themeId, options = {}) {
   }
 
   const wasOwned = sceneOwnsTheme(scene, themeId);
-  const price = Number(theme.price || 0);
+  const price = LOCAL_ONLY_CUSTOMIZATION ? 0 : Number(theme.price || 0);
   if (!wasOwned && price > 0) {
     if (gameData.inventory.coins < price) {
       if (!skipToast) {
@@ -1458,11 +1700,7 @@ async function equipSceneTheme(themeId, options = {}) {
   renderDecoratePanel();
   renderStatus();
   if (!skipToast) {
-    if (!wasOwned && price > 0) {
-      toast(`已购买并切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
-    } else {
-      toast(`已切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
-    }
+    toast(`已切换到 ${theme.label}${bridgeSaved ? "" : "（离线）"}`);
   }
   return {
     ok: true,
@@ -1493,7 +1731,7 @@ async function applyThemeBundle(themeId) {
   state.pendingThemeAction = true;
   renderDecoratePanel();
   try {
-    const bundlePrice = Number(bundle.price || 0);
+    const bundlePrice = LOCAL_ONLY_CUSTOMIZATION ? 0 : Number(bundle.price || 0);
     const wasBundleOwned = sceneOwnsBundle(scene, bundle.id);
     if (!wasBundleOwned) {
       if (bundlePrice > 0 && gameData.inventory.coins < bundlePrice) {
@@ -1533,9 +1771,7 @@ async function applyThemeBundle(themeId) {
     if (granted > 0) detail.push(`赠送 ${granted} 件`);
     if (plan.invalid > 0) detail.push(`跳过 ${plan.invalid} 项不兼容`);
     let actionLabel = "已应用";
-    if (acquiredBundle && bundlePrice > 0) {
-      actionLabel = "已购买并应用";
-    } else if (acquiredBundle) {
+    if (acquiredBundle) {
       actionLabel = "已领取并应用";
     }
     toast(`${actionLabel} ${bundle.label}（${detail.join("，")}）${bridgeSaved ? "" : "（离线）"}`);
@@ -1543,6 +1779,50 @@ async function applyThemeBundle(themeId) {
     state.pendingThemeAction = false;
     renderDecoratePanel();
   }
+}
+
+async function equipSceneBackground(backgroundId) {
+  const scene = activeScene();
+  if (!scene || !canUseBackgroundInScene(backgroundId, state.currentScene)) return;
+  const background = backgroundOptionsForScene(scene).find((option) => option.id === backgroundId);
+  if (!background) return;
+  if (scene.backgroundId === backgroundId) {
+    toast(`${background.label} 已经是当前背景`);
+    return;
+  }
+  scene.backgroundId = backgroundId;
+  await saveGameState();
+  renderDecoratePanel();
+  renderStatus();
+  toast(`已切换到 ${background.label}`);
+}
+
+function renderBackgroundList() {
+  if (!el.backgroundList || !el.backgroundCurrentLabel) return;
+  const scene = activeScene();
+  const backgrounds = backgroundOptionsForScene(scene);
+  const currentBackground = sceneBackground(scene);
+  el.backgroundList.innerHTML = "";
+
+  if (!backgrounds.length) {
+    el.backgroundCurrentLabel.textContent = "房间背景";
+    el.backgroundList.innerHTML = '<div class="decor-card"><strong>当前场景暂无可替换背景</strong><span>后续开放</span></div>';
+    return;
+  }
+
+  el.backgroundCurrentLabel.textContent = currentBackground ? `房间背景 · ${currentBackground.label}` : "房间背景";
+  backgrounds.forEach((background) => {
+    const equipped = scene.backgroundId === background.id;
+    const button = document.createElement("button");
+    button.className = `background-card${equipped ? " active" : ""}`;
+    button.type = "button";
+    button.dataset.backgroundId = background.id;
+    button.innerHTML = `${backgroundThumbnailMarkup(background)}<span class="decor-copy"><strong>${background.label}</strong><span>${backgroundStatusText(background, equipped)}</span></span>`;
+    button.addEventListener("click", () => {
+      void equipSceneBackground(background.id);
+    });
+    el.backgroundList.append(button);
+  });
 }
 
 function renderThemeList() {
@@ -1580,8 +1860,8 @@ function renderThemeList() {
     const bundle = themeBundleForApply(theme.id, state.currentScene);
     if (bundle) {
       const plan = resolveBundleEquipPlan(bundle, scene);
-      const bundleOwned = sceneOwnsBundle(scene, bundle.id);
-      const bundlePrice = Number(bundle.price || 0);
+      const bundleOwned = LOCAL_ONLY_CUSTOMIZATION || sceneOwnsBundle(scene, bundle.id);
+      const bundlePrice = LOCAL_ONLY_CUSTOMIZATION ? 0 : Number(bundle.price || 0);
       const unaffordable = !bundleOwned && bundlePrice > gameData.inventory.coins;
       const bundleButton = document.createElement("button");
       bundleButton.className = [
@@ -1598,7 +1878,7 @@ function renderThemeList() {
         : bundlePrice > 0
           ? `购买并应用 · ${bundlePrice} 金币`
           : "领取并应用";
-      bundleButton.innerHTML = `<strong>${bundleActionLabel} · ${plan.entries.length}/${plan.total} 槽位</strong><span>${bundle.label}${plan.invalid > 0 ? ` · 跳过 ${plan.invalid} 项` : bundleOwned ? " · 已拥有" : ""}</span>`;
+      bundleButton.innerHTML = `<strong>${bundleActionLabel} · ${plan.entries.length}/${plan.total} 槽位</strong><span>${bundle.label}${plan.invalid > 0 ? ` · 跳过 ${plan.invalid} 项` : LOCAL_ONLY_CUSTOMIZATION ? " · 本地可用" : bundleOwned ? " · 已拥有" : ""}</span>`;
       bundleButton.addEventListener("click", () => {
         if (state.pendingThemeAction) return;
         void applyThemeBundle(theme.id);
@@ -1610,6 +1890,46 @@ function renderThemeList() {
   });
 }
 
+function renderPlacementTools(zone) {
+  if (!el.decoratePlacementTools) return;
+  if (!zone) {
+    el.decoratePlacementTools.innerHTML = "";
+    return;
+  }
+  const hasPlacement = Boolean(zone.placementRect);
+  el.decoratePlacementTools.innerHTML = `
+    <small>${hasPlacement ? "已使用自定义位置；点击房间空地可继续移动" : "点击房间空地可移动当前家具位置"}</small>
+    <button type="button" data-placement-reset ${hasPlacement ? "" : "disabled"}>重置位置</button>
+  `;
+}
+
+function roomCustomizationStats(scene = activeScene()) {
+  const slots = decoratableObjects(scene);
+  const changedFurniture = slots.filter(([, zone]) => zone.itemId !== zone.defaultItemId).length;
+  const movedFurniture = slots.filter(([, zone]) => Boolean(zone.placementRect)).length;
+  const total = slots.length;
+  const theme = sceneTheme(scene);
+  const background = sceneBackground(scene);
+  const defaultThemeId = defaultThemeIdForScene(state.currentScene);
+  const defaultBackgroundId = defaultBackgroundIdForScene(scene);
+  const themeChanged = Boolean(scene.themeId && scene.themeId !== defaultThemeId);
+  const backgroundChanged = Boolean(scene.backgroundId && scene.backgroundId !== defaultBackgroundId);
+  return { theme, background, changedFurniture, movedFurniture, total, themeChanged, backgroundChanged };
+}
+
+function renderRoomSummary() {
+  if (!el.roomSummaryTitle || !el.roomSummaryMeta || !el.resetRoomBtn) return;
+  const stats = roomCustomizationStats();
+  el.roomSummaryTitle.textContent = stats.background ? stats.background.label : activeScene().label;
+  const detail = [];
+  detail.push(stats.backgroundChanged ? `背景 ${stats.background.label}` : "默认背景");
+  detail.push(stats.themeChanged ? "主题已调整" : "默认主题");
+  detail.push(`${stats.changedFurniture}/${stats.total} 件替换`);
+  detail.push(`${stats.movedFurniture} 件移动`);
+  el.roomSummaryMeta.textContent = detail.join(" · ");
+  el.resetRoomBtn.disabled = !stats.backgroundChanged && !stats.themeChanged && stats.changedFurniture === 0 && stats.movedFurniture === 0;
+}
+
 function renderDecoratePanel() {
   if (!el.decorateDrawer) return;
   const slots = decoratableObjects();
@@ -1618,6 +1938,9 @@ function renderDecoratePanel() {
     el.decorateSlotList.innerHTML = '<div class="decor-card"><strong>当前场景暂无可替换槽位</strong><span>先回到室内试试</span></div>';
     el.decorateItemList.innerHTML = "";
     el.decorateCurrentSlot.textContent = "无可用槽位";
+    renderPlacementTools(null);
+    renderRoomSummary();
+    renderBackgroundList();
     renderThemeList();
     return;
   }
@@ -1630,7 +1953,7 @@ function renderDecoratePanel() {
     const button = document.createElement("button");
     button.className = `decor-card${state.selectedDecorObjectId === objectId ? " active" : ""}`;
     button.type = "button";
-    button.innerHTML = `${swatchMarkup(item)}<span class="decor-copy"><strong>${zone.slot}</strong><span>${item?.label || zone.label}</span></span>`;
+    button.innerHTML = `${itemThumbMarkup(item)}<span class="decor-copy"><strong>${zone.slot}</strong><span>${item?.label || zone.label}</span></span>`;
     button.addEventListener("click", () => {
       state.selectedDecorObjectId = objectId;
       state.hoverZone = zone;
@@ -1642,6 +1965,7 @@ function renderDecoratePanel() {
   const selected = activeScene().zones[state.selectedDecorObjectId];
   const selectedItem = itemForZone(selected);
   el.decorateCurrentSlot.textContent = selected ? `${selected.slot} · ${selectedItem?.label || selected.label}` : "选择槽位";
+  renderPlacementTools(selected);
   el.decorateItemList.innerHTML = "";
   catalogItemsForSlot(selected.slot).forEach(([itemId, item]) => {
     const owned = ownedCount(itemId);
@@ -1655,12 +1979,14 @@ function renderDecoratePanel() {
       unaffordable ? "unaffordable" : "",
     ].filter(Boolean).join(" ");
     button.type = "button";
-    button.innerHTML = `${swatchMarkup(item)}<span class="decor-copy"><strong>${item.label}</strong><span>${itemCommerceText(itemId, item)}</span><i class="rarity">${locked ? "SHOP" : item.rarity}</i></span>`;
+    button.innerHTML = `${itemThumbMarkup(item)}<span class="decor-copy"><strong>${item.label}</strong><span>${itemCommerceText(itemId, item)}</span><i class="rarity">${locked ? "SHOP" : item.rarity}</i></span>`;
     button.addEventListener("click", () => {
       void replaceDecorItem(itemId);
     });
     el.decorateItemList.append(button);
   });
+  renderRoomSummary();
+  renderBackgroundList();
   renderThemeList();
 }
 
@@ -1681,11 +2007,75 @@ function closeDecoratePanel() {
   el.decorateDrawer.setAttribute("aria-hidden", "true");
 }
 
+async function moveSelectedDecorObjectTo(point) {
+  const zone = activeScene().zones[state.selectedDecorObjectId];
+  if (!state.decorating || !zone || !zoneSupportsAction(zone, "decorate_replace")) return false;
+  const bounds = zoneDefaultRenderRect(zone);
+  const width = clamp(bounds.w || 0.1, 0.05, 0.32);
+  const height = clamp(bounds.h || 0.08, 0.05, 0.34);
+  zone.placementRect = normalizePlacementRect({
+    x: point.x - width / 2,
+    y: point.y - height / 2,
+    w: width,
+    h: height,
+  });
+  zone.customInteractionPoint = nearestWalkablePoint({
+    x: zone.placementRect.x + zone.placementRect.w / 2,
+    y: zone.placementRect.y + zone.placementRect.h,
+  });
+  state.hoverZone = zone;
+  state.hotspotPulse = { zone, until: Date.now() + 900 };
+  await saveGameState();
+  renderDecoratePanel();
+  toast(`${zone.slot} 已移动`);
+  return true;
+}
+
+async function resetSelectedDecorPlacement() {
+  const zone = activeScene().zones[state.selectedDecorObjectId];
+  if (!zone?.placementRect) return;
+  delete zone.placementRect;
+  delete zone.customInteractionPoint;
+  state.hoverZone = zone;
+  state.hotspotPulse = { zone, until: Date.now() + 900 };
+  await saveGameState();
+  renderDecoratePanel();
+  toast(`${zone.slot} 已恢复默认位置`);
+}
+
+async function resetRoomCustomization() {
+  const scene = activeScene();
+  const defaultThemeId = defaultThemeIdForScene(state.currentScene);
+  if (defaultThemeId) {
+    scene.themeId = defaultThemeId;
+    scene.ownedThemeIds = Array.from(new Set([...(scene.ownedThemeIds || []), defaultThemeId]));
+  }
+  const defaultBackgroundId = defaultBackgroundIdForScene(scene);
+  if (defaultBackgroundId) {
+    scene.backgroundId = defaultBackgroundId;
+  }
+  decoratableObjects(scene).forEach(([, zone]) => {
+    zone.itemId = zone.defaultItemId;
+    const item = itemForZone(zone);
+    zone.label = item?.label || zone.defaultLabel;
+    delete zone.placementRect;
+    delete zone.customInteractionPoint;
+  });
+  state.hoverZone = null;
+  await saveGameState();
+  renderDecoratePanel();
+  renderStatus();
+  toast("房间已恢复默认");
+}
+
 async function replaceDecorItem(itemId) {
   const zone = activeScene().zones[state.selectedDecorObjectId];
   const item = gameData.itemCatalog[itemId];
   if (!zone || !item || !item.slots?.includes(zone.slot)) return;
   if (!(await ensureOwned(itemId, item))) return;
+  if (LOCAL_ONLY_CUSTOMIZATION) {
+    gameData.inventory.owned[itemId] = Math.max(1, Number(gameData.inventory.owned[itemId]) || 0);
+  }
   zone.itemId = itemId;
   zone.label = item.label;
   state.hotspotPulse = { zone, until: Date.now() + 900 };
@@ -1701,6 +2091,10 @@ async function replaceDecorItem(itemId) {
 
 async function ensureOwned(itemId, item) {
   if (ownedCount(itemId) > 0) return true;
+  if (LOCAL_ONLY_CUSTOMIZATION && item?.actions?.includes("decorate_replace")) {
+    gameData.inventory.owned[itemId] = Math.max(1, Number(gameData.inventory.owned[itemId]) || 0);
+    return true;
+  }
   const price = itemPrice(item);
   if (!price) {
     toast(`${item.label} 暂未开放购买`);
@@ -2124,6 +2518,98 @@ function targetZoneForTask(kind) {
   return findZoneByAction("indoor", "preview_work", "studyDesk");
 }
 
+function normalizeLocalAgentState(input) {
+  if (!input || typeof input !== "object") return null;
+  const status = LOCAL_AGENT_STATUS_LABELS[input.status] ? input.status : "idle";
+  return {
+    schemaVersion: 1,
+    agentId: input.agentId || "codex-local",
+    petId: input.petId || localRuntime()?.pet?.id || null,
+    status,
+    taskLabel: input.taskLabel || LOCAL_AGENT_STATUS_LABELS[status],
+    activeTool: input.activeTool || null,
+    updatedAt: input.updatedAt || new Date().toISOString(),
+  };
+}
+
+function localAgentStateSignature(agentState) {
+  return [
+    agentState?.agentId,
+    agentState?.petId,
+    agentState?.status,
+    agentState?.taskLabel,
+    agentState?.activeTool,
+    agentState?.updatedAt,
+  ].join("|");
+}
+
+function applyLocalAgentState(agentState, options = {}) {
+  const normalized = normalizeLocalAgentState(agentState);
+  if (!normalized) return;
+  const runtime = localRuntime();
+  if (runtime) runtime.agentState = normalized;
+  if (options.source) state.localAgentStateSource = options.source;
+  if (options.remember) {
+    state.syncedLocalAgentState = normalized;
+    state.syncedLocalAgentStateSource = options.source || state.localAgentStateSource;
+  }
+
+  const signature = localAgentStateSignature(normalized);
+  if (!options.force && state.localAgentStateSignature === signature) return;
+  state.localAgentStateSignature = signature;
+
+  const targetZone = localAgentTargetZone(normalized);
+  const label = localAgentLabel(normalized);
+  if (!targetZone || !label) return;
+  if (state.currentScene !== "indoor") {
+    setScene("indoor", { silent: true, status: label });
+  }
+
+  state.working = normalized.status === "coding" || normalized.status === "tool_calling";
+  const working = state.working;
+  activeAgent().realStatus = label;
+  moveAgentTo(zoneInteractionPoint(targetZone, scenes.indoor), label, {
+    working,
+    showTarget: false,
+  });
+  if (normalized.status === "error") {
+    setBubble("本地状态显示异常，需要查看。", 3200);
+  } else if (normalized.status === "waiting_user") {
+    setBubble("我在等你下一步。", 2600);
+  }
+  renderStatus();
+}
+
+async function fetchLocalAgentState() {
+  const runtime = localRuntime();
+  const statePath = runtime?.agentStatePath || "/local-agent-space/agent-state.json";
+  try {
+    const response = await fetch(`${statePath}?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function startLocalAgentStateSync() {
+  const runtime = localRuntime();
+  if (!runtime) return;
+  if (!runtime.agentStateAvailable && runtime.status !== "local-pet") {
+    state.syncedLocalAgentState = normalizeLocalAgentState(runtime.agentState);
+    state.syncedLocalAgentStateSource = "fallback";
+    state.localAgentStateSource = "fallback";
+    renderLocalStateControls();
+    return;
+  }
+  applyLocalAgentState(runtime.agentState, { force: true, remember: true, source: "file" });
+  state.localAgentStateTimer = window.setInterval(async () => {
+    if (state.localAgentPreviewLocked) return;
+    const next = await fetchLocalAgentState();
+    if (next) applyLocalAgentState(next, { remember: true, source: "file" });
+  }, LOCAL_AGENT_STATE_POLL_MS);
+}
+
 function sendPrompt() {
   const text = el.promptInput.value.trim();
   if (!text) return;
@@ -2205,16 +2691,17 @@ function finishTask(prompt, kind) {
   };
   agent.realStatus = "任务完成，等你查看";
   setBubble("做好了，点我头顶的标记");
-  toast("任务完成，点击 Aria 头顶标记查看");
+  toast(`任务完成，点击 ${activeAgentDisplayName()} 头顶标记查看`);
   renderStatus();
 }
 
 function buildArtifact(prompt, kind) {
+  const agentName = activeAgentDisplayName();
   if (kind === "research") {
     return `# 查资料结果\n\n任务：${prompt}\n\n- Agent 会移动到书柜边，表示查资料 / 搜索\n- 这个状态和电脑前工作分开\n- 真实产品里搜索结果会由本地 Bridge 写入 artifact`;
   }
   if (kind === "cook") {
-    return `# 厨房产物\n\n任务：${prompt}\n\nAria 做了一份小菜单：番茄热汤、香草煎蛋、清甜白菜沙拉。`;
+    return `# 厨房产物\n\n任务：${prompt}\n\n${agentName} 做了一份小菜单：番茄热汤、香草煎蛋、清甜白菜沙拉。`;
   }
   if (kind === "plan") {
     return `# 计划草稿\n\n任务：${prompt}\n\n- 先保持客厅聊天状态\n- 再把确认后的事项转成工作任务\n- 需要执行时移动到电脑前`;
@@ -2231,10 +2718,95 @@ function openArtifact() {
   el.artifactDrawer.setAttribute("aria-hidden", "false");
 }
 
+function localPetDisplayName() {
+  const runtime = localRuntime();
+  if (runtime?.status !== "local-pet") return null;
+  return runtime?.pet?.displayName || runtime?.pet?.id || null;
+}
+
+function activeAgentDisplayName(name = state.activeAgent) {
+  return localPetDisplayName() || name;
+}
+
+function renderAgentTabs() {
+  const localName = localPetDisplayName();
+  if (!localName) return;
+  el.agentTabs.innerHTML = "";
+  const button = document.createElement("button");
+  button.className = "active";
+  button.type = "button";
+  button.dataset.agent = state.activeAgent;
+  button.textContent = localName;
+  el.agentTabs.append(button);
+}
+
+function localAgentStateSourceLabel() {
+  if (state.localAgentPreviewLocked || state.localAgentStateSource === "preview") return "预览中";
+  if (state.localAgentStateSource === "file") return "agent-state.json";
+  return "内置状态";
+}
+
+function renderLocalStateControls() {
+  if (!el.localStateControls || !el.localStateMeta) return;
+  const currentStatus = activeLocalAgentState()?.status || "idle";
+  el.localStateControls.innerHTML = "";
+
+  LOCAL_AGENT_STATUS_OPTIONS.forEach((option) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.localAgentStatus = option.status;
+    button.classList.toggle("active", option.status === currentStatus);
+    button.setAttribute("aria-pressed", option.status === currentStatus ? "true" : "false");
+    button.textContent = option.label;
+    el.localStateControls.append(button);
+  });
+
+  const resetButton = document.createElement("button");
+  resetButton.type = "button";
+  resetButton.dataset.localAgentReset = "true";
+  resetButton.textContent = "文件";
+  el.localStateControls.append(resetButton);
+  el.localStateMeta.textContent = `${localAgentStateSourceLabel()} · ${localAgentLabel() || LOCAL_AGENT_STATUS_LABELS.idle}`;
+}
+
+function previewLocalAgentStatus(status) {
+  const option = LOCAL_AGENT_STATUS_OPTIONS.find((item) => item.status === status);
+  if (!option) return;
+  const current = activeLocalAgentState() || state.syncedLocalAgentState || {};
+  const next = {
+    ...current,
+    status: option.status,
+    taskLabel: LOCAL_AGENT_STATUS_LABELS[option.status],
+    activeTool: option.tool,
+    updatedAt: new Date().toISOString(),
+  };
+  state.localAgentPreviewLocked = true;
+  applyLocalAgentState(next, { force: true, source: "preview" });
+  renderLocalStateControls();
+  toast(`状态预览：${LOCAL_AGENT_STATUS_LABELS[option.status]}`);
+}
+
+async function resetLocalAgentPreview() {
+  state.localAgentPreviewLocked = false;
+  const next = await fetchLocalAgentState();
+  if (next) {
+    applyLocalAgentState(next, { force: true, remember: true, source: "file" });
+  } else {
+    applyLocalAgentState(state.syncedLocalAgentState || localRuntime()?.agentState, {
+      force: true,
+      remember: true,
+      source: state.syncedLocalAgentStateSource || "fallback",
+    });
+  }
+  renderLocalStateControls();
+  toast("已回到本地状态文件");
+}
+
 function renderStatus() {
   const agent = activeAgent();
-  el.activeAgentName.textContent = state.activeAgent;
-  el.coinValue.textContent = String(gameData.inventory.coins);
+  const runtime = localRuntime();
+  el.activeAgentName.textContent = activeAgentDisplayName();
+  el.coinValue.textContent = LOCAL_ONLY_CUSTOMIZATION ? "全解锁" : String(gameData.inventory.coins);
   el.energyText.textContent = String(Math.round(agent.energy));
   el.moodText.textContent = String(Math.round(agent.mood));
   el.expText.textContent = String(Math.round(agent.exp));
@@ -2257,12 +2829,15 @@ function renderStatus() {
       const selectedZone = selectedFarmZone();
       const summary = selectedZone ? farmSummaryForZone(selectedZone) : null;
       el.previewHint.textContent = farmPreviewHint(summary);
+    } else if (runtime?.status === "local-pet") {
+      el.previewHint.textContent = "本地 Codex pet";
     } else {
-      el.previewHint.textContent = "真实状态";
+      el.previewHint.textContent = "本地状态";
     }
   }
   drawAvatar();
   renderSaveDebug();
+  renderLocalStateControls();
   renderFarmActionPanel();
 }
 
@@ -2271,7 +2846,7 @@ function resolveBridgeUrl() {
   const override = query.get("bridge");
   if (override === "off") return null;
   if (override) return override;
-  return "ws://127.0.0.1:8787/bridge";
+  return null;
 }
 
 function bridgeRequest(method, params = {}) {
@@ -2443,16 +3018,22 @@ function switchAgent(name) {
   document.querySelectorAll(".agent-tabs button").forEach((button) => {
     button.classList.toggle("active", button.dataset.agent === name);
   });
-  el.promptInput.placeholder = `对 ${name} 说句话，或让 TA 做点事...`;
+  el.promptInput.placeholder = `对 ${activeAgentDisplayName(name)} 说句话，或让 TA 做点事...`;
   renderStatus();
   if (state.decorating) renderDecoratePanel();
 }
 
 function drawAvatar() {
   avatarCtx.clearRect(0, 0, 72, 72);
-  avatarCtx.imageSmoothingEnabled = true;
   if (agentImage.complete && agentImage.naturalWidth) {
-    avatarCtx.drawImage(agentImage, 220, 40, 610, 760, 6, 0, 60, 74);
+    const petFrame = petFrameForAnimation("idle", Date.now());
+    if (petFrame) {
+      avatarCtx.imageSmoothingEnabled = false;
+      avatarCtx.drawImage(agentImage, petFrame.x, petFrame.y, petFrame.w, petFrame.h, 7, 5, 58, 63);
+    } else {
+      avatarCtx.imageSmoothingEnabled = true;
+      avatarCtx.drawImage(agentImage, 220, 40, 610, 760, 6, 0, 60, 74);
+    }
   }
 }
 
@@ -2468,6 +3049,10 @@ canvas.addEventListener("click", (event) => {
   }
   const zone = zoneAt(scenePoint);
   if (!zone) {
+    if (state.decorating) {
+      void moveSelectedDecorObjectTo(scenePoint);
+      return;
+    }
     handleGroundClick(scenePoint);
     return;
   }
@@ -2491,7 +3076,7 @@ canvas.addEventListener("click", (event) => {
 canvas.addEventListener("mousemove", (event) => {
   const rect = canvas.getBoundingClientRect();
   state.hoverZone = zoneAt(canvasToScene({ x: event.clientX - rect.left, y: event.clientY - rect.top }));
-  canvas.style.cursor = state.hoverZone ? "pointer" : "default";
+  canvas.style.cursor = state.hoverZone ? "pointer" : state.decorating ? "copy" : "default";
 });
 
 canvas.addEventListener("mouseleave", () => {
@@ -2542,6 +3127,29 @@ document.querySelector("#settingsBtn").addEventListener("click", () => {
   openDecoratePanel();
 });
 
+el.localStateControls?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.dataset.localAgentReset) {
+    void resetLocalAgentPreview();
+    return;
+  }
+  if (button.dataset.localAgentStatus) {
+    previewLocalAgentStatus(button.dataset.localAgentStatus);
+  }
+});
+
+el.decoratePlacementTools?.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-placement-reset]");
+  if (!button || button.disabled) return;
+  void resetSelectedDecorPlacement();
+});
+
+el.resetRoomBtn?.addEventListener("click", () => {
+  if (el.resetRoomBtn.disabled) return;
+  void resetRoomCustomization();
+});
+
 el.modeBtn.addEventListener("click", () => {
   const online = el.modeLabel.textContent === "单机";
   el.modeLabel.textContent = online ? "联机预览" : "单机";
@@ -2563,6 +3171,11 @@ window.addEventListener("hashchange", () => {
 });
 
 renderStatus();
+renderAgentTabs();
 switchAgent("Aria");
+startLocalAgentStateSync();
 void hydrateFromBridge();
+window.AGENT_SPACE_READY = true;
 requestAnimationFrame(draw);
+
+export {};

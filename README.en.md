@@ -2,7 +2,7 @@
 
 Language: [中文](README.md) | English
 
-Agent Space is intended to become a full product where local AI agents have a visual living space, decorated homes, farm loops, and human-agent social play.
+Agent Space is intended to become a 2.5D visual living space for local AI agents and Codex pets. Phase one prioritizes local pet state, room life, backgrounds, and furniture customization; farm loops, multiple agents, online sync, and social features come later.
 
 This repository is being upgraded into the main Agent Space project. The current Web experience is now treated as the early version of the final Web client, not as a disposable demo.
 
@@ -14,8 +14,11 @@ The project now has a Vite + TypeScript + PixiJS foundation. After installing de
 
 ```sh
 npm install
+npm run setup:local
 npm run dev
 ```
+
+`npm run dev` automatically runs `setup:local` first. Local setup scans `$CODEX_HOME/pets` or `~/.codex/pets`, imports Codex pet visual assets into the git-ignored `public/local-agent-space/` runtime folder, and falls back to the built-in agent asset when no local pet is available.
 
 The default renderer keeps the current complete legacy canvas behavior. A PixiJS renderer foundation is available through:
 
@@ -30,30 +33,31 @@ This PixiJS entry is the first stage of the production renderer. Backgrounds, ob
 - Full indoor room stage.
 - Separate yard scene, reached by clicking the indoor door.
 - Bottom conversation dock with agent tabs, settings, and input.
-- HUD for agent status, energy, mood, and coins.
+- HUD for agent status, energy, mood, and local customization state.
 - Object-body `hitAreas` for visible art objects.
+- Per-slot `renderRect` data for sprite size and 2.5D placement, separate from click hit areas.
 - Scene navigation through the door.
 - Ground click movement with walkable snapping.
 - Walking animation with facing flip, bob, target marker, and easing.
 - Conversation-driven work/rest states.
-- Slot-based decoration drawer and local coin shop prototype.
-- Browser `localStorage` save for coins, owned items, and placed furniture.
+- Slot-based decoration drawer with locally unlocked backgrounds, themes, and furniture.
+- Browser `localStorage` save for background, theme, placed furniture, and local placement state, with old coin fields kept only for compatibility.
+- Local pet runtime through `scripts/setup-local.mjs`, `pet-manifest.json`, and `agent-state.json`.
+- Local state debug flow through `npm run agent:state -- coding`, plus in-drawer status preview buttons for room behavior mapping.
 - PixiJS renderer foundation in `src/pixi/pixi-foundation.ts`.
 
 ## Product Direction
 
 This repository is meant to reach the final Agent Space product, not only the Web room prototype.
 
-The current phase upgrades the Web client from static canvas prototype to Vite + TypeScript + PixiJS. Later phases:
+The current phase upgrades the Web client from static canvas prototype to a local Codex pet visual room. Later phases:
 
-- game model package
-- ASP protocol
-- Local Bridge
-- Web client connected to Local Bridge
-- Cloud Hub
-- farm, neighbors, feed
-- decoration assets and shop
-- desktop pet
+- local Codex pet / `agentState` sync
+- local room background, theme bundle, and furniture customization
+- PixiJS 2.5D object layer plus Tiled-style object data
+- more local agent adapters
+- yard and farm as living-space extensions
+- Cloud Hub, online sync, and social play
 
 See [ROADMAP.en.md](ROADMAP.en.md) and [docs/product-evolution.en.md](docs/product-evolution.en.md).
 
@@ -67,7 +71,7 @@ npm run bridge:start
 - Health: `http://127.0.0.1:8787/healthz`
 - Protocol docs: `docs/asp-v0.1.zh-CN.md` (English: `docs/asp-v0.1.en.md`)
 - SQLite default path: `bridge/.runtime/agent-space-bridge.sqlite`
-- Frontend now uses bridge-first write paths (buy, equip, reset) with automatic `localStorage` fallback when bridge is unavailable.
+- The frontend uses `localStorage` by default and does not require the bridge. Enable bridge debugging explicitly with `?bridge=ws://127.0.0.1:8787/bridge`.
 
 ## Local Validation
 

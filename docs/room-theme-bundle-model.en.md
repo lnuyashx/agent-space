@@ -1,6 +1,6 @@
 # Room Theme And Furniture Bundle Model
 
-This document defines the V1 product/data model for room decoration commerce. The goal is to stabilize themes, furniture bundles, ownership, and equip flow before wiring real rendering, payment, and social visits.
+This document defines the V1 data model for room themes and furniture bundles. Earlier versions framed this as decoration commerce; phase one now treats customization as locally unlocked, so `price`, `saleMode`, and ownership fields are compatibility hooks and future product experiments, not the P1 purchase flow.
 
 ## Data Entry
 
